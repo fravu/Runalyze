@@ -265,7 +265,7 @@ class PDOforRunalyze extends PDO {
 	 * @return PDOStatement <b>PDO::query</b> returns a PDOStatement object, or <b>FALSE</b>
 	 * on failure.
 	 */
-	public function query(string $statement, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false {
+	public function query($statement, $fetchMode = null, ...$fetchModeArgs) {
 		if ($this->addsAccountID) {
 			$this->addAccountIDtoStatement($statement);
 		}
