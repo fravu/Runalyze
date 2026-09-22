@@ -29,6 +29,22 @@
                 <input type="submit" class="submit" value="{% trans %}Sync now{% endtrans %}">
             </form>
 
+            <div class="panel-heading panel-sub-heading">
+                <h1>{% trans %}Skip older activities{% endtrans %}</h1>
+            </div>
+            <p class="info">
+                {% trans %}By default sync starts from your very first Garmin Connect activity, which can be a lot of activities if you have a long history. Set a date here to only fetch activities from that date onwards instead.{% endtrans %}
+            </p>
+            <form method="post" action="{{ url('tools-garmin-sync-set-since') }}">
+                <div class="padding-5">
+                    <label for="since_date">{% trans %}Only sync activities from{% endtrans %}</label>
+                    <input type="date" id="since_date" name="since_date" value="{{ lastSync > 0 ? (lastSync|date('Y-m-d')) : '' }}" required>
+                </div>
+                <div class="c">
+                    <input type="submit" class="submit" value="{% trans %}Set start date{% endtrans %}">
+                </div>
+            </form>
+
             <p class="c">
                 <a href="{{ url('tools-garmin-sync-disconnect') }}">{% trans %}Disconnect Garmin Connect account{% endtrans %}</a>
             </p>

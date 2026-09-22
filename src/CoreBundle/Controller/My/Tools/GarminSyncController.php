@@ -138,6 +138,31 @@ class GarminSyncController extends Controller
     }
 
     /**
+     * Lets the user skip straight to a given date instead of syncing their
+     * complete Garmin Connect history (which for a long-time user can be
+     * thousands of activities).
+     *
+     * @Route("/my/tools/garmin-sync/set-since", name="tools-garmin-sync-set-since")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function setSinceAction(Request $request, Account $account)
+    {
+        $date = (string)$request->request->get('since_date', '');
+        $timestamp = '' !== $date ? strtotime($date.' 00:00:00 UTC') : false;
+
+        if (false === $timestamp) {
+            $this->addFlash('error', $this->get('translator')->trans('Please choose a valid date.'));
+        } else {
+            $this->confRepository()->updateOrInsert($account, self::CONF_CATEGORY, self::CONF_LAST_SYNC, (string)$timestamp);
+            $this->addFlash('success', $this->get('translator')->trans('Garmin sync will now only fetch activities from %date% onwards.', [
+                '%date%' => date('d.m.Y', $timestamp),
+            ]));
+        }
+
+        return $this->redirectToRoute('tools-garmin-sync');
+    }
+
+    /**
      * Runs the existing bulk-import command against whatever .fit files
      * are currently in $importDir (if any), then removes them either way -
      * the import copies files into data/import/ itself, so nothing is lost
