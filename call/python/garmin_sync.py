@@ -17,10 +17,14 @@ Usage:
         stores the resulting session tokens in <session_dir> for reuse by
         later "sync" calls (no password is stored on disk).
 
-    garmin_sync.py sync <session_dir> <since_epoch> <target_dir>
+    garmin_sync.py sync <session_dir> <since_epoch> <target_dir> <max_activities>
         Resumes the saved session, fetches activities started after
-        <since_epoch> (unix timestamp, UTC), downloads each as a .fit file
-        into <target_dir>, and prints a JSON summary to stdout.
+        <since_epoch> (unix timestamp, UTC), downloads at most
+        <max_activities> of them (newest first) as .fit files into
+        <target_dir>, and prints a JSON summary to stdout. If there are
+        more matching activities left after the cap, "more_available" is
+        true in the result and the same since_epoch boundary can simply be
+        used again to continue.
 
 All output is a single JSON object on stdout:
     {"status": "ok", ...}
@@ -93,13 +97,19 @@ def extract_fit_from_zip(zip_bytes):
         return z.read(fit_names[0])
 
 
-def cmd_sync(session_dir, since_epoch, target_dir):
+def cmd_sync(session_dir, since_epoch, target_dir, max_activities):
     Garmin = import_garmin()
 
     try:
         since_epoch = int(since_epoch)
     except ValueError:
         fail("since_epoch must be an integer unix timestamp.")
+        return
+
+    try:
+        max_activities = int(max_activities)
+    except ValueError:
+        fail("max_activities must be an integer.")
         return
 
     try:
@@ -114,7 +124,14 @@ def cmd_sync(session_dir, since_epoch, target_dir):
 
     downloaded = []
     errors = []
-    latest_epoch = since_epoch
+    # The oldest activity's timestamp among everything we looked at in this
+    # run - NOT the newest. Activities come back newest-first, so this is
+    # exactly the boundary the next run needs to resume from without either
+    # re-downloading everything again or silently skipping a gap of
+    # activities that were never reached because of the max_activities cap.
+    oldest_processed_epoch = None
+    more_available = False
+    processed_count = 0
 
     start = 0
     batch_size = 20
@@ -139,6 +156,11 @@ def cmd_sync(session_dir, since_epoch, target_dir):
                     stop = True
                     break
 
+                if processed_count >= max_activities:
+                    more_available = True
+                    stop = True
+                    break
+
                 try:
                     zip_bytes = client.download_activity(
                         activity_id,
@@ -148,9 +170,14 @@ def cmd_sync(session_dir, since_epoch, target_dir):
                     fit_path = target / f"{activity_id}.fit"
                     fit_path.write_bytes(fit_bytes)
                     downloaded.append(fit_path.name)
-                    latest_epoch = max(latest_epoch, activity_epoch)
                 except Exception as e:
                     errors.append(f"activity {activity_id}: {e}")
+
+                processed_count += 1
+                oldest_processed_epoch = (
+                    activity_epoch if oldest_processed_epoch is None
+                    else min(oldest_processed_epoch, activity_epoch)
+                )
 
             if stop or len(activities) < batch_size:
                 break
@@ -164,7 +191,10 @@ def cmd_sync(session_dir, since_epoch, target_dir):
         "status": "ok",
         "downloaded": downloaded,
         "errors": errors,
-        "latest_epoch": latest_epoch,
+        "more_available": more_available,
+        # Only meaningful when something was actually processed; the caller
+        # should keep using the previous since_epoch otherwise.
+        "resume_epoch": oldest_processed_epoch,
     }))
 
 
@@ -179,10 +209,10 @@ def main():
     if mode == "login":
         cmd_login(session_dir)
     elif mode == "sync":
-        if len(sys.argv) < 5:
-            fail("Usage: garmin_sync.py sync <session_dir> <since_epoch> <target_dir>")
+        if len(sys.argv) < 6:
+            fail("Usage: garmin_sync.py sync <session_dir> <since_epoch> <target_dir> <max_activities>")
             return
-        cmd_sync(session_dir, sys.argv[3], sys.argv[4])
+        cmd_sync(session_dir, sys.argv[3], sys.argv[4], sys.argv[5])
     else:
         fail(f"Unknown mode '{mode}'.")
 
