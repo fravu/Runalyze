@@ -48,6 +48,28 @@ class GarminSyncController extends Controller
     }
 
     /**
+     * PHP_BINARY can be an empty string on some server setups (seen with
+     * some PHP-FPM configurations), which makes Process silently try to
+     * run an empty command ("exec: : Permission denied"). Fall back to
+     * common CLI paths, and finally to a bare "php" that relies on PATH,
+     * rather than trusting PHP_BINARY blindly.
+     *
+     * @return string
+     */
+    private function phpCliBinary()
+    {
+        $fs = new Filesystem();
+
+        foreach ([PHP_BINARY, '/usr/bin/php', '/usr/local/bin/php'] as $candidate) {
+            if ('' !== $candidate && $fs->exists($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return 'php';
+    }
+
+    /**
      * @return \Runalyze\Bundle\CoreBundle\Entity\ConfRepository
      */
     private function confRepository()
@@ -179,7 +201,7 @@ class GarminSyncController extends Controller
         }
 
         $importProcess = new Process([
-            PHP_BINARY,
+            $this->phpCliBinary(),
             $this->getParameter('kernel.root_dir').'/../bin/console',
             'runalyze:activity:bulk-import',
             $account->getUsername(),
