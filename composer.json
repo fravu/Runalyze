@@ -6,7 +6,7 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
-        "php": "~7",
+        "php": "~7|~8",
         "symfony/symfony": "~3.4.49",
         "sensio/framework-extra-bundle": "~5.4",
         "twig/twig": "~1.44",
