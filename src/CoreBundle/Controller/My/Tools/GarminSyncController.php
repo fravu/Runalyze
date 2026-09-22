@@ -185,10 +185,11 @@ class GarminSyncController extends Controller
     }
 
     /**
-     * Runs the existing bulk-import command against whatever .fit files
-     * are currently in $importDir (if any), then removes them either way -
-     * the import copies files into data/import/ itself, so nothing is lost
-     * by clearing this temporary folder afterwards.
+     * Runs the existing bulk-import command against whatever .fit files are
+     * currently in $importDir (if any). On success the files are removed
+     * (the import copies them into data/import/ itself). On failure they
+     * are deliberately left in place so the next run's leftover-recovery
+     * check can retry them instead of losing already-downloaded data.
      *
      * @return string|null error message, or null on success/nothing to do
      */
@@ -219,9 +220,18 @@ class GarminSyncController extends Controller
             $error = $e->getMessage();
         }
 
+        if ($failed) {
+            // Leave the downloaded files in place so the next run's
+            // leftover-recovery step can retry the import instead of the
+            // data just being silently deleted.
+            return $error;
+        }
+
+        // The import copies files into data/import/ itself, so the
+        // downloaded copies here are no longer needed once it succeeded.
         $fs->remove($importDir);
 
-        return $failed ? $error : null;
+        return null;
     }
 
     /**
