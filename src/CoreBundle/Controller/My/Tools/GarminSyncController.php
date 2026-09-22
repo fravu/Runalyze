@@ -48,28 +48,6 @@ class GarminSyncController extends Controller
     }
 
     /**
-     * PHP_BINARY can be an empty string on some server setups (seen with
-     * some PHP-FPM configurations), which makes Process silently try to
-     * run an empty command ("exec: : Permission denied"). Fall back to
-     * common CLI paths, and finally to a bare "php" that relies on PATH,
-     * rather than trusting PHP_BINARY blindly.
-     *
-     * @return string
-     */
-    private function phpCliBinary()
-    {
-        $fs = new Filesystem();
-
-        foreach ([PHP_BINARY, '/usr/bin/php', '/usr/local/bin/php'] as $candidate) {
-            if ('' !== $candidate && $fs->exists($candidate) && is_executable($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return 'php';
-    }
-
-    /**
      * @return \Runalyze\Bundle\CoreBundle\Entity\ConfRepository
      */
     private function confRepository()
@@ -185,53 +163,38 @@ class GarminSyncController extends Controller
     }
 
     /**
-     * Runs the existing bulk-import command against whatever .fit files are
-     * currently in $importDir (if any). On success the files are removed
-     * (the import copies them into data/import/ itself). On failure they
-     * are deliberately left in place so the next run's leftover-recovery
-     * check can retry them instead of losing already-downloaded data.
+     * Moves any downloaded .fit files from the temporary per-account Garmin
+     * download folder into the shared data/import/ folder that the normal
+     * browser upload also uses, so the same file-picker/preview page
+     * (activity-upload) can be used instead of forcing an all-or-nothing
+     * import. Using that page also means each activity is parsed and
+     * imported individually - a single activity with bad/out-of-range data
+     * shows as one error there instead of, as the bulk-import console
+     * command does, aborting the entire batch on the first failure.
      *
-     * @return string|null error message, or null on success/nothing to do
+     * @return string[] filenames (relative to data/import/) moved
      */
-    private function importDownloadedFiles(Account $account, $importDir)
+    private function moveIntoImportQueue($garminDownloadDir)
     {
+        $fitFiles = glob($garminDownloadDir.'/*.fit');
+
+        if (empty($fitFiles)) {
+            return [];
+        }
+
         $fs = new Filesystem();
+        $targetDir = $this->getParameter('data_directory').'/import';
+        $fs->mkdir($targetDir);
 
-        if (!$fs->exists($importDir) || 0 === count(glob($importDir.'/*.fit'))) {
-            return null;
+        $filenames = [];
+
+        foreach ($fitFiles as $file) {
+            $basename = basename($file);
+            $fs->rename($file, $targetDir.'/'.$basename, true);
+            $filenames[] = $basename;
         }
 
-        $importProcess = new Process([
-            $this->phpCliBinary(),
-            $this->getParameter('kernel.root_dir').'/../bin/console',
-            'runalyze:activity:bulk-import',
-            $account->getUsername(),
-            $importDir,
-            '--env='.$this->getParameter('kernel.environment'),
-        ]);
-        $importProcess->setTimeout(600);
-
-        try {
-            $importProcess->run();
-            $failed = !$importProcess->isSuccessful();
-            $error = trim($importProcess->getErrorOutput()) ?: trim($importProcess->getOutput());
-        } catch (\Throwable $e) {
-            $failed = true;
-            $error = $e->getMessage();
-        }
-
-        if ($failed) {
-            // Leave the downloaded files in place so the next run's
-            // leftover-recovery step can retry the import instead of the
-            // data just being silently deleted.
-            return $error;
-        }
-
-        // The import copies files into data/import/ itself, so the
-        // downloaded copies here are no longer needed once it succeeded.
-        $fs->remove($importDir);
-
-        return null;
+        return $filenames;
     }
 
     /**
@@ -246,74 +209,69 @@ class GarminSyncController extends Controller
             return $this->redirectToRoute('tools-garmin-sync');
         }
 
-        $importDir = $this->getParameter('data_directory').'/import/garmin_sync/'.$account->getId();
+        $downloadDir = $this->getParameter('data_directory').'/import/garmin_sync/'.$account->getId();
 
-        // Recover files from a previous run that downloaded fine but never
-        // got imported (e.g. because the process was killed by a timeout
-        // right after finishing downloads) before doing anything else.
-        if (null !== $leftoverError = $this->importDownloadedFiles($account, $importDir)) {
-            $this->addFlash('error', $this->get('translator')->trans('Found activities downloaded by a previous sync that failed to import: %reason%', [
-                '%reason%' => $leftoverError,
-            ]));
+        // Pick up files from a previous run that downloaded fine but never
+        // made it into the picker (e.g. the process was killed by a
+        // timeout right after finishing downloads) before fetching
+        // anything new, so nothing already downloaded is ever lost.
+        $pending = $this->moveIntoImportQueue($downloadDir);
+
+        if (empty($pending)) {
+            (new Filesystem())->mkdir($downloadDir);
+
+            $since = $this->lastSyncEpoch($account);
+
+            $process = new Process([
+                $this->getParameter('python3_path'),
+                $this->scriptPath(),
+                'sync',
+                $this->sessionDir($account),
+                (string)$since,
+                $downloadDir,
+                (string)self::MAX_ACTIVITIES_PER_RUN,
+            ]);
+            $process->setTimeout(300);
+            $result = $this->runProcess($process);
+
+            if ('ok' !== $result['status']) {
+                $this->addFlash('error', $this->get('translator')->trans('Garmin sync failed: %reason%', [
+                    '%reason%' => $result['message'] ?? 'unknown error',
+                ]));
+
+                return $this->redirectToRoute('tools-garmin-sync');
+            }
+
+            $pending = $this->moveIntoImportQueue($downloadDir);
+
+            if (isset($result['resume_epoch'])) {
+                // This advances as soon as activities are downloaded from
+                // Garmin, regardless of which ones the user then actually
+                // picks on the next page - otherwise skipped activities
+                // would keep reappearing on every future sync.
+                $this->confRepository()->updateOrInsert($account, self::CONF_CATEGORY, self::CONF_LAST_SYNC, (string)$result['resume_epoch']);
+            }
+
+            if (!empty($result['errors'])) {
+                $this->addFlash('error', $this->get('translator')->trans('%count% activities could not be downloaded, see server log for details.', [
+                    '%count%' => count($result['errors']),
+                ]));
+            }
+
+            if (!empty($result['more_available'])) {
+                $this->addFlash('info', $this->get('translator')->trans('There are more activities left to sync (capped at %max% per click) - click "Sync now" again once you are done here to continue.', [
+                    '%max%' => self::MAX_ACTIVITIES_PER_RUN,
+                ]));
+            }
+        }
+
+        if (empty($pending)) {
+            $this->addFlash('success', $this->get('translator')->trans('No new activities found on Garmin Connect.'));
 
             return $this->redirectToRoute('tools-garmin-sync');
         }
 
-        (new Filesystem())->mkdir($importDir);
-
-        $since = $this->lastSyncEpoch($account);
-
-        $process = new Process([
-            $this->getParameter('python3_path'),
-            $this->scriptPath(),
-            'sync',
-            $this->sessionDir($account),
-            (string)$since,
-            $importDir,
-            (string)self::MAX_ACTIVITIES_PER_RUN,
-        ]);
-        $process->setTimeout(300);
-        $result = $this->runProcess($process);
-
-        if ('ok' !== $result['status']) {
-            $this->addFlash('error', $this->get('translator')->trans('Garmin sync failed: %reason%', [
-                '%reason%' => $result['message'] ?? 'unknown error',
-            ]));
-
-            return $this->redirectToRoute('tools-garmin-sync');
-        }
-
-        $downloaded = $result['downloaded'] ?? [];
-
-        if (null !== $importError = $this->importDownloadedFiles($account, $importDir)) {
-            $this->addFlash('error', $this->get('translator')->trans('Activities were downloaded from Garmin but the import failed: %reason%', [
-                '%reason%' => $importError,
-            ]));
-
-            return $this->redirectToRoute('tools-garmin-sync');
-        }
-
-        if (isset($result['resume_epoch'])) {
-            $this->confRepository()->updateOrInsert($account, self::CONF_CATEGORY, self::CONF_LAST_SYNC, (string)$result['resume_epoch']);
-        }
-
-        if (!empty($result['errors'])) {
-            $this->addFlash('error', $this->get('translator')->trans('%count% activities could not be downloaded, see server log for details.', [
-                '%count%' => count($result['errors']),
-            ]));
-        }
-
-        $this->addFlash('success', $this->get('translator')->trans('%count% new activities imported from Garmin Connect.', [
-            '%count%' => count($downloaded),
-        ]));
-
-        if (!empty($result['more_available'])) {
-            $this->addFlash('info', $this->get('translator')->trans('There are more activities left to sync (capped at %max% per click) - click "Sync now" again to continue.', [
-                '%max%' => self::MAX_ACTIVITIES_PER_RUN,
-            ]));
-        }
-
-        return $this->redirectToRoute('tools-garmin-sync');
+        return $this->redirectToRoute('activity-upload', ['files' => implode(';', $pending)]);
     }
 
     /**
