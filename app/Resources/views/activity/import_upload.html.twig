@@ -19,8 +19,8 @@
         </div>
         
         <script>
-            var submittedFiles = [], completedFiles = 0, uploadedFiles = 0;
-        
+            var submittedFiles = [], successfulFiles = [], uploadedFiles = 0;
+
             new qq.FineUploaderBasic({
                 button: $("#file-upload")[0],
                 request: {
@@ -39,28 +39,31 @@
                     },
                     onComplete: function(id, fileName, responseJSON) {
                         uploadedFiles++;
-        
+
                         if (responseJSON.success) {
-                            completedFiles++;
-        
-                            if (completedFiles == submittedFiles.length) {
-                                $(".appended-by-uploader").remove();
-        
-                                if (completedFiles == 1) {
-                                    $("#ajax").loadDiv('{{ url('activity-upload') }}?file='+encodeURIComponent(submittedFiles[0]));
-                                } else {
-                                    $("#ajax").loadDiv('{{ url('activity-upload') }}?files='+encodeURIComponent(submittedFiles.join(';')));
-                                }
-                            }
+                            successfulFiles.push(fileName.replace(/;/g, '_-_'));
                         } else {
-                            $("#ajax").append('<p class="error appended-by-uploader">{% trans %}There were problems while uploading.{% endtrans %}</p>');
+                            $("#ajax").append('<p class="error appended-by-uploader">'+fileName+': {% trans %}There were problems while uploading.{% endtrans %}</p>');
                         }
-        
+
+                        // Wait until every submitted file has finished (success or error),
+                        // then continue with whatever succeeded instead of hanging forever
+                        // if a single file in the batch failed.
                         if (uploadedFiles == submittedFiles.length) {
                             $("#upload-container").removeClass('loading');
-        
+
+                            if (successfulFiles.length > 0) {
+                                $(".appended-by-uploader").remove();
+
+                                if (successfulFiles.length == 1) {
+                                    $("#ajax").loadDiv('{{ url('activity-upload') }}?file='+encodeURIComponent(successfulFiles[0]));
+                                } else {
+                                    $("#ajax").loadDiv('{{ url('activity-upload') }}?files='+encodeURIComponent(successfulFiles.join(';')));
+                                }
+                            }
+
                             submittedFiles = [];
-                            completedFiles = 0;
+                            successfulFiles = [];
                             uploadedFiles = 0;
                         }
                     }
