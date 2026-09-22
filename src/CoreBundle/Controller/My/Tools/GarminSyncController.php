@@ -51,7 +51,12 @@ class GarminSyncController extends Controller
 
     private function isConnected(Account $account)
     {
-        return (new Filesystem())->exists($this->sessionDir($account).'/oauth2_token.json');
+        $fs = new Filesystem();
+        $dir = $this->sessionDir($account);
+
+        // Different versions/forks of the underlying Python package store
+        // session tokens under different filenames - check for either.
+        return $fs->exists($dir.'/garmin_tokens.json') || $fs->exists($dir.'/oauth2_token.json');
     }
 
     private function lastSyncEpoch(Account $account)
