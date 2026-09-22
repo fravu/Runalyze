@@ -1,0 +1,54 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    <div class="panel-heading">
+        <h1>{% trans %}Garmin Connect sync{% endtrans %}</h1>
+    </div>
+
+    <div class="panel-content">
+        <p class="info">
+            {% trans %}This uses your normal Garmin Connect login to fetch new activities on demand. This is not an official Garmin feature - it can stop working if Garmin changes their login system.{% endtrans %}
+        </p>
+
+        {% include 'flashmessages.html.twig' %}
+
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+
+        {% if connected %}
+            <p class="text">
+                {% if lastSync > 0 %}
+                    {% trans with {'%date%': lastSync|date('d.m.Y H:i')} %}Last sync: %date%{% endtrans %}
+                {% else %}
+                    {% trans %}Not synced yet.{% endtrans %}
+                {% endif %}
+            </p>
+
+            <form method="post" action="{{ url('tools-garmin-sync-run') }}" class="c">
+                <input type="submit" class="submit" value="{% trans %}Sync now{% endtrans %}">
+            </form>
+
+            <p class="c">
+                <a href="{{ url('tools-garmin-sync-disconnect') }}">{% trans %}Disconnect Garmin Connect account{% endtrans %}</a>
+            </p>
+        {% else %}
+            <form method="post" action="{{ url('tools-garmin-sync') }}">
+                <div class="padding-5">
+                    <label for="garmin_email">{% trans %}Garmin Connect email{% endtrans %}</label>
+                    <input type="email" id="garmin_email" name="garmin_email" class="fullwidth" required>
+                </div>
+                <div class="padding-5">
+                    <label for="garmin_password">{% trans %}Garmin Connect password{% endtrans %}</label>
+                    <input type="password" id="garmin_password" name="garmin_password" class="fullwidth" required>
+                </div>
+                <p class="info">
+                    {% trans %}Your password is only used once to establish a session and is not stored.{% endtrans %}
+                </p>
+                <div class="c">
+                    <input type="submit" class="submit" value="{% trans %}Connect{% endtrans %}">
+                </div>
+            </form>
+        {% endif %}
+    </div>
+{% endblock %}

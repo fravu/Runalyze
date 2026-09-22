@@ -6,3 +6,9 @@ vendor/composer/tmp-*
 vendor/willdurand/geocoder/tests/.cached_responses/
 # tmp cache for unit-tests
 tests/.phpunit.result.cache
+# Garmin Connect session tokens - never commit these
+data/garmin_session/
+# temporary download folder used while syncing from Garmin Connect
+data/import/garmin_sync/
+__pycache__/
+*.pyc
