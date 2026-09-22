@@ -265,10 +265,15 @@ class PDOforRunalyze extends PDO {
 	 * @return PDOStatement <b>PDO::query</b> returns a PDOStatement object, or <b>FALSE</b>
 	 * on failure.
 	 */
-	public function query($statement, $fetchMode = null, ...$fetchModeArgs) {
+	public function query($statement, ...$fetchModeArgs) {
 		if ($this->addsAccountID) {
 			$this->addAccountIDtoStatement($statement);
 		}
-		return parent::query($statement, $fetchMode, ...$fetchModeArgs);
+
+		// PDO::query() treats an explicitly passed (even null) $fetchMode
+		// differently from an omitted one - forwarding only the arguments
+		// that were actually given avoids "mode must be an integer" errors
+		// on calls that only ever pass the statement.
+		return parent::query($statement, ...$fetchModeArgs);
 	}
 }
