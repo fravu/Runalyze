@@ -303,7 +303,7 @@ class BasicEndurance
 						0
 					) as `points`
 				FROM '.PREFIX.'training
-				WHERE `accountid`='.\SessionAccountHandler::getId().' AND `time` BETWEEN '.$StartTimeForLongjogs.' AND '.$timestamp.' AND `sportid`='.Configuration::General()->runningSport().' AND distance>'.$this->MIN_KM_FOR_LONGJOG;
+				WHERE `accountid`='.\SessionAccountHandler::getId().' AND `time` BETWEEN '.$StartTimeForLongjogs.' AND '.$timestamp.' AND `sportid`='.Configuration::General()->runningSport().' AND `use_vo2max`=1 AND '.\Runalyze\Bundle\CoreBundle\Entity\Training::sqlPlausibleRunningSpeed().' AND distance>'.$this->MIN_KM_FOR_LONGJOG;
         }
 
         return '
@@ -322,7 +322,7 @@ class BasicEndurance
 					)
 				) as `sum`
 			FROM '.PREFIX.'training
-			WHERE `accountid`='.\SessionAccountHandler::getId().' AND `time` BETWEEN '.min($StartTimeForLongjogs, $StartTimeForWeekKm).' AND '.$timestamp.' AND `sportid`='.Configuration::General()->runningSport().'
+			WHERE `accountid`='.\SessionAccountHandler::getId().' AND `time` BETWEEN '.min($StartTimeForLongjogs, $StartTimeForWeekKm).' AND '.$timestamp.' AND `sportid`='.Configuration::General()->runningSport().' AND `use_vo2max`=1 AND '.\Runalyze\Bundle\CoreBundle\Entity\Training::sqlPlausibleRunningSpeed().'
 			GROUP BY accountid
 			LIMIT 1';
     }

@@ -22,6 +22,34 @@ use Symfony\Component\Validator\Constraints as Assert;
 class Training implements IdentifiableEntityInterface, AccountRelatedEntityInterface
 {
     /**
+     * Faster than this (km/h, i.e. 2:24 min/km) a "run" can't be real running,
+     * e.g. a motorcycle or car ride recorded with a watch. Such activities are
+     * ignored for marathon shape and VO2max shape.
+     *
+     * @var float
+     */
+    const MAX_PLAUSIBLE_RUNNING_SPEED_KMH = 25.0;
+
+    /**
+     * SQL condition (legacy queries, plain column names) for plausible running speed
+     *
+     * @param string $tablePrefix e.g. 'tr.' or ''
+     * @return string
+     */
+    public static function sqlPlausibleRunningSpeed($tablePrefix = '')
+    {
+        return '('.$tablePrefix.'`s` = 0 OR '.$tablePrefix.'`distance` * 3600 <= '.self::MAX_PLAUSIBLE_RUNNING_SPEED_KMH.' * '.$tablePrefix.'`s`)';
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasImplausibleRunningSpeed()
+    {
+        return $this->s > 0 && $this->distance > 0 && $this->distance * 3600 / $this->s > self::MAX_PLAUSIBLE_RUNNING_SPEED_KMH;
+    }
+
+    /**
      * @var int
      *
      * @ORM\Column(name="id", type="integer", precision=10, unique=true, nullable=false, options={"unsigned":true})

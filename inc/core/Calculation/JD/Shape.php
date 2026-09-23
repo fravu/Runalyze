@@ -67,6 +67,7 @@ class Shape
 			FROM `'.PREFIX.'training`
 			WHERE
 				`sportid`='.(int)$this->RunningID.' AND
+				'.\Runalyze\Bundle\CoreBundle\Entity\Training::sqlPlausibleRunningSpeed().' AND
 				`time` BETWEEN '.($time - $this->Configuration->days() * DAY_IN_S).' AND '.$time.' AND
 				`accountid`='.(int)$this->AccountID.'
 			GROUP BY `sportid`

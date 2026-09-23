@@ -187,6 +187,32 @@ class SportRepository extends EntityRepository
         return new SportStatistics((new LocalTime($timestamp))->toServerTime(), $queryBuilder->getQuery()->getResult());
     }
 
+    /**
+     * Sport with the generic profile of this account, created if missing.
+     * Used for imported activities whose sport Runalyze doesn't know
+     * (motorcycling, driving, ...) so they don't end up as running.
+     *
+     * @param Account $account
+     * @return Sport
+     */
+    public function findOrCreateGenericFor(Account $account)
+    {
+        $sport = $this->findInternalIdFor(SportProfile::GENERIC, $account);
+
+        if (null === $sport) {
+            $sport = new Sport();
+            $sport->setDataFrom(new \Runalyze\Profile\Sport\Generic());
+            $sport->setName(0 === strpos((string)$account->getLanguage(), 'de') ? 'Sonstiges' : 'Other');
+            $sport->setDistances(true);
+            $sport->setOutside(true);
+            $sport->setAccount($this->_em->getReference(Account::class, $account->getId()));
+
+            $this->save($sport);
+        }
+
+        return $sport;
+    }
+
     public function save(Sport $sport)
     {
         $this->_em->persist($sport);

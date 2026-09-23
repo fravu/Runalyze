@@ -87,6 +87,7 @@ class ActivityDataContainerToActivityContextConverter
         $this->setRouteFor($activity, $container);
         $this->setHrvFor($activity, $container);
         $this->setRaceResultFor($activity, $container);
+        $this->excludeImplausibleRunFromShapes($activity);
 
         return $activity;
     }
@@ -152,6 +153,13 @@ class ActivityDataContainerToActivityContextConverter
 
         if (null !== $internalId) {
             $sport = $this->SportRepository->findInternalIdFor($internalId, $this->Account);
+
+            // The file names a sport that isn't running, but the account has no
+            // matching sport (e.g. motorcycling): never fall back to the main
+            // sport (usually running), that would spoil marathon/VO2max shape.
+            if (null === $sport && SportProfile::RUNNING != $internalId) {
+                $sport = $this->SportRepository->findOrCreateGenericFor($this->Account);
+            }
         }
 
         if (null === $sport) {
@@ -186,6 +194,23 @@ class ActivityDataContainerToActivityContextConverter
         }
 
         return null;
+    }
+
+    /**
+     * A "run" faster than Training::MAX_PLAUSIBLE_RUNNING_SPEED_KMH is not a run
+     * (e.g. motorcycle ride without sport information): don't use it for shapes.
+     */
+    protected function excludeImplausibleRunFromShapes(Training $activity)
+    {
+        if (null === $activity->getSport() || !$activity->hasImplausibleRunningSpeed()) {
+            return;
+        }
+
+        $runningSportId = $this->ConfigurationManager->getList($this->Account)->getGeneral()->getRunningSport();
+
+        if ($activity->getSport()->getId() == $runningSportId || SportProfile::RUNNING == $activity->getSport()->getInternalSportId()) {
+            $activity->setUseVO2max(false);
+        }
     }
 
     protected function tryToSetTypeFor(Training $activity, Metadata $metadata)
