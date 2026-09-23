@@ -99,6 +99,13 @@ class EditController extends Controller
     {
         $ids = array_filter(explode(',', $request->get('ids', '')));
 
+        // The multi editor only works inside the overlay of the dashboard.
+        // Opened as a standalone page it has no navigation and no way out,
+        // so let the dashboard open it in the overlay instead.
+        if (!$request->isXmlHttpRequest() && !empty($ids)) {
+            return $this->redirect($this->generateUrl('dashboard').'#multi-editor='.implode(',', array_map('intval', $ids)));
+        }
+
         return $this->getResponseForMultiEditor($ids, $account);
     }
 
