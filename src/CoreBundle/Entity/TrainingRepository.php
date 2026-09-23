@@ -54,11 +54,15 @@ class TrainingRepository extends EntityRepository
             return false;
         }
 
+        // setMaxResults(1): the account may already contain the same activity
+        // more than once, which must not turn this check into a
+        // NonUniqueResultException.
         return null !== $this->createQueryBuilder('t')
             ->select('1')
             ->where('t.account = :account AND t.activityId = :id')
             ->setParameter('account', $activity->getAccount())
             ->setParameter('id', $activity->getActivityId())
+            ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
     }
