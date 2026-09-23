@@ -264,6 +264,7 @@ CREATE TABLE IF NOT EXISTS `runalyze_sport` (
   `speed` varchar(10) NOT NULL DEFAULT 'min/km',
   `power` tinyint(1) unsigned NOT NULL DEFAULT '0',
   `outside` tinyint(1) unsigned NOT NULL DEFAULT '0',
+  `exclude_from_trimp` tinyint(1) unsigned NOT NULL DEFAULT '0',
   `default_privacy` tinyint(1) unsigned NOT NULL DEFAULT '1',
   `hr_zone_bounds` VARCHAR(200) DEFAULT NULL,
   `main_equipmenttypeid` int(10) unsigned DEFAULT NULL,

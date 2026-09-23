@@ -107,7 +107,8 @@
 
             {{ form_row(form.power, {'div_class': 'w100 block checkbox-first', 'help': 'Power is recorded or calculated.'}) }}
             {{ form_row(form.outside, {'div_class': 'w100 block checkbox-first', 'help': 'Sport is performed outdoor: activate route, weather, ...'}) }}
-            {{ form_row(form.distances, {'div_class': 'w100 block checkbox-first margin-bottom'}) }}
+            {{ form_row(form.distances, {'div_class': 'w100 block checkbox-first'}) }}
+            {{ form_row(form.excludeFromTrimp, {'div_class': 'w100 block checkbox-first margin-bottom', 'help': 'Aktivitäten dieser Sportart zählen nicht für ATL, CTL, TSB und Monotonie (z. B. Motorrad, Auto).'}) }}
         </fieldset>
 
         <fieldset class="margin-bottom">

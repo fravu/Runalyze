@@ -75,11 +75,11 @@ if ($Year >= START_YEAR && $Year <= date('Y') && START_TIME != time()) {
 	$Statement = DB::getInstance()->query(
 		'SELECT
 			DATEDIFF(FROM_UNIXTIME(`time`), "'.$StartDay.'") as `index`,
-			`trimp`,
+			IF('.\Runalyze\Calculation\Performance\ModelQuery::sqlNotExcludedFromTrimp().', `trimp`, 0) as `trimp`,
 			`distance`,
 			'.JD\Shape::mysqlVO2MAXsum($withElevation).' as `vo2max_weighted`,
 			'.JD\Shape::mysqlVO2MAXsumTime($withElevation).' as `vo2max_sum_time`,
-			`sportid` = "'.Configuration::General()->runningSport().'" as `is_running`
+			(`sportid` = "'.Configuration::General()->runningSport().'" AND `use_vo2max` = 1 AND '.\Runalyze\Bundle\CoreBundle\Entity\Training::sqlPlausibleRunningSpeed().') as `is_running`
 		FROM `'.PREFIX.'training`
 		WHERE
 			`accountid`='.\SessionAccountHandler::getId().' AND

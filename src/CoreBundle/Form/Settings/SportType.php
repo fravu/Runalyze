@@ -106,6 +106,10 @@ class SportType extends AbstractType
                 'required' => false,
                 'label' => 'Has a distance'
             ])
+            ->add('excludeFromTrimp', CheckboxType::class, [
+                'required' => false,
+                'label' => 'Nicht in Trainingsbelastung einrechnen'
+            ])
             ->add('defaultPrivacy', ChoiceType::class, [
                 'required' => true,
                 'label' => 'Default privacy',
@@ -194,7 +198,9 @@ class SportType extends AbstractType
             }
         }
 
-        if (isset($choicesWithIdsAsKeys[SportProfile::GENERIC])) {
+        // keep 'generic' for a sport that already has it (e.g. 'Sonstiges' created by the importer),
+        // otherwise saving the form would silently remove it
+        if (isset($choicesWithIdsAsKeys[SportProfile::GENERIC]) && (null === $sport || null === $sport->getInternalSportId() || SportProfile::GENERIC != $sport->getInternalSportId())) {
             unset($choicesWithIdsAsKeys[SportProfile::GENERIC]);
         }
 

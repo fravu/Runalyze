@@ -87,6 +87,8 @@ class ModelQuery
             $Where .= ' AND `sportid`=' . (int)$this->SportId;
         }
 
+        $Where .= ' AND ' . self::sqlNotExcludedFromTrimp();
+
         $Query = '
 			SELECT
 				`time`,
@@ -98,5 +100,16 @@ class ModelQuery
 			GROUP BY `date`';
 
         return $Query;
+    }
+
+    /**
+     * Activities of sports marked with `exclude_from_trimp` (e.g. motorcycling)
+     * don't count for performance models (ATL/CTL/TSB) and monotony.
+     *
+     * @return string
+     */
+    public static function sqlNotExcludedFromTrimp()
+    {
+        return '`sportid` NOT IN (SELECT `id` FROM `' . PREFIX . 'sport` WHERE `exclude_from_trimp` = 1 AND `accountid` = ' . (int)\SessionAccountHandler::getId() . ')';
     }
 }

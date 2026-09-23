@@ -231,8 +231,8 @@ class RunalyzePluginPanel_Rechenspiele extends PluginPanel {
 							$Monotony->valueAsPercentage(),
 							(
 								$Monotony->value() > Monotony::CRITICAL ? ProgressBarSingle::$COLOR_RED
-								: $Monotony->value() > Monotony::WARNING ? ProgressBarSingle::$COLOR_ORANGE
-								: ProgressBarSingle::$COLOR_GREEN
+								: ($Monotony->value() > Monotony::WARNING ? ProgressBarSingle::$COLOR_ORANGE
+								: ProgressBarSingle::$COLOR_GREEN)
 							)
 					)
 				),

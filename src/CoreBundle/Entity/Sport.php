@@ -95,6 +95,13 @@ class Sport implements IdentifiableEntityInterface, NamedEntityInterface, Accoun
     private $outside = false;
 
     /**
+     * @var bool true: activities of this sport don't count for ATL/CTL/TSB and monotony
+     *
+     * @ORM\Column(name="exclude_from_trimp", type="boolean", options={"default":0})
+     */
+    private $excludeFromTrimp = false;
+
+    /**
      * @var bool true: defaults to private
      *
      * @ORM\Column(name="default_privacy", type="boolean")
@@ -398,6 +405,26 @@ class Sport implements IdentifiableEntityInterface, NamedEntityInterface, Accoun
     public function getOutside()
     {
         return $this->outside;
+    }
+
+    /**
+     * @param bool $flag
+     *
+     * @return $this
+     */
+    public function setExcludeFromTrimp($flag)
+    {
+        $this->excludeFromTrimp = (bool)$flag;
+
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getExcludeFromTrimp()
+    {
+        return $this->excludeFromTrimp;
     }
 
     /**
