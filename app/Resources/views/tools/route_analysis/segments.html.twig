@@ -1,0 +1,68 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/route_analysis/_shared.html.twig' %}
+
+    <div class="panel-menu">
+        <ul>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-climbs') }}">Anstiege</a></li>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-heatmap') }}">Heatmap</a></li>
+        </ul>
+    </div>
+
+    <div class="panel-heading">
+        <h1>Segmente</h1>
+    </div>
+
+    <div class="panel-content">
+        {% if pending > 0 %}
+            <div id="ra-seg-scan" class="ra-progress info">
+                <i class="fa fa-spinner fa-spin"></i>
+                Prüfe Aktivitäten auf Segmente: noch <strong id="ra-seg-pending">{{ pending }}</strong> …
+            </div>
+        {% endif %}
+
+        <table class="fullwidth zebra-style ra-table">
+            <thead>
+                <tr><th>Segment</th><th>Sport</th><th class="r">Länge</th><th class="r">Höhe</th><th class="r">Ø</th><th class="r">Versuche</th><th class="r">Bestzeit</th><th class="r">Zuletzt</th></tr>
+            </thead>
+            <tbody>
+                {% for segment in segments %}
+                    <tr class="link" onclick="$('#ajax').loadDiv('{{ url('tools-segment', {'id': segment.id}) }}');">
+                        <td>{{ segment.name }}</td>
+                        <td>{% if segment.sportid %}<i class="{{ segment.sporticon }}"></i> {{ segment.sportname }}{% else %}alle{% endif %}</td>
+                        <td class="r">{{ segment.distance|number_format(2, ',', '.') }} km</td>
+                        <td class="r">{{ segment.gain }} m</td>
+                        <td class="r">{{ segment.avg_grade|number_format(1, ',', '.') }} %</td>
+                        <td class="r">{{ segment.efforts }}</td>
+                        <td class="r">{{ segment.best is null ? '–' : segment.best|duration }}</td>
+                        <td class="r">{{ segment.last ? segment.last|date('d.m.Y') : '–' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8"><em>Noch keine Segmente. Lege eins aus einer Aktivität an oder speichere einen Anstieg als Segment.</em></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p class="c"><a class="ajax" target="ajax" href="{{ url('tools-segment-new') }}"><i class="fa fa-plus"></i> Neues Segment aus einer Aktivität</a></p>
+        <p class="info small">Eine Aktivität zählt für ein Segment, wenn sie Start und Ende auf 25 m genau trifft und dazwischen mindestens 90 % der Strecke auf 30 m genau abdeckt. Neue Aktivitäten werden beim Öffnen dieser Seite geprüft.</p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+        {% if pending > 0 %}
+        (function scan() {
+            if (!$('#ra-seg-scan').length) return;
+            $.post('{{ url('tools-segments-scan') }}').done(function(res) {
+                if (!$('#ra-seg-scan').length) return;
+                if (!res.complete) { $('#ra-seg-pending').text(res.pending); scan(); }
+                else { $('#ajax').loadDiv('{{ url('tools-segments') }}'); }
+            }).fail(function(xhr) {
+                $('#ra-seg-scan').removeClass('info').addClass('error').text('Prüfung abgebrochen: ' + xhr.status + ' ' + xhr.statusText);
+            });
+        })();
+        {% endif %}
+    })(jQuery);
+    </script>
+{% endblock %}

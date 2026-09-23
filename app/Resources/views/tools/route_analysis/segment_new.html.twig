@@ -1,0 +1,123 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/route_analysis/_shared.html.twig' %}
+
+    <div class="panel-menu">
+        <ul>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-segments') }}"><i class="fa fa-chevron-left"></i> Alle Segmente</a></li>
+        </ul>
+    </div>
+
+    <div class="panel-heading">
+        <h1>Neues Segment</h1>
+    </div>
+
+    <div class="panel-content">
+        <p>
+            <select id="ra-new-activity" style="max-width:100%">
+                <option value="0">Aktivität wählen …</option>
+                {% for a in activities %}
+                    <option value="{{ a.id }}"{% if a.id == activityId %} selected{% endif %}>{{ a.time|date('d.m.Y') }} · {{ a.sportname }} · {{ a.distance|number_format(1, ',', '.') }} km · {{ (a.routename ?: a.title)|slice(0, 60) }}</option>
+                {% endfor %}
+            </select>
+        </p>
+
+        <div id="ra-new-work" style="display:none">
+            <p class="info small">Im Höhenprofil mit gedrückter Maustaste den Abschnitt markieren. Die Auswahl erscheint blau auf der Karte.</p>
+            <svg id="ra-new-profile" class="ra-profile"></svg>
+            <div id="ra-new-map" class="ra-map-small"></div>
+
+            <div class="ra-kv" id="ra-new-stats"></div>
+
+            <p>
+                <label>Name <input type="text" id="ra-new-name" size="40" maxlength="100"></label>
+                <label style="margin-left:12px"><input type="checkbox" id="ra-new-only-sport" checked> nur diese Sportart vergleichen</label>
+            </p>
+            <p class="c"><input type="button" id="ra-new-save" value="Segment anlegen" disabled></p>
+        </div>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+        var map = null, routeLine = null, selLine = null, marker = null, pts = [], sel = null;
+        var preset = { from: {{ from }}, to: {{ to }} };
+
+        function nearestByIndex(index) {
+            var best = 0;
+            for (var j = 1; j < pts.length; j++) if (Math.abs(pts[j][0] - index) < Math.abs(pts[best][0] - index)) best = j;
+            return best;
+        }
+
+        function select(a, b) {
+            sel = [a, b];
+            var latlngs = pts.slice(a, b + 1).filter(function(p) { return p[3] !== null; }).map(function(p) { return [p[3], p[4]]; });
+            if (selLine) map.removeLayer(selLine);
+            selLine = latlngs.length ? L.polyline(latlngs, { color: '#1f5fa8', weight: 6 }).addTo(map) : null;
+            var km = pts[b][1] - pts[a][1], gain = (pts[a][2] !== null && pts[b][2] !== null) ? pts[b][2] - pts[a][2] : null;
+            $('#ra-new-stats').html(
+                '<div><strong>' + km.toFixed(2).replace('.', ',') + ' km</strong><small>Länge</small></div>' +
+                '<div><strong>' + (gain === null ? '–' : Math.round(gain) + ' m') + '</strong><small>Höhendifferenz</small></div>' +
+                '<div><strong>' + (gain === null || km <= 0 ? '–' : (gain / km / 10).toFixed(1).replace('.', ',') + ' %') + '</strong><small>Ø Steigung</small></div>' +
+                '<div><strong>' + (pts[b][5] !== null && pts[a][5] !== null ? RouteTools.duration(pts[b][5] - pts[a][5]) : '–') + '</strong><small>Zeit in dieser Aktivität</small></div>'
+            );
+            $('#ra-new-save').prop('disabled', km < 0.05);
+        }
+
+        function load(activityId) {
+            $('#ra-new-work').hide();
+            if (!activityId) return;
+            $.getJSON('{{ url('tools-route-track', {'activityId': 0}) }}'.replace(/0$/, activityId), { max: 1500 }).done(function(track) {
+                pts = track.points;
+                $('#ra-new-work').show();
+                $('#ra-new-name').val(track.title || '');
+                if (!map) map = RouteTools.createMap('ra-new-map', '{{ layer|e('js') }}');
+                [routeLine, selLine, marker].forEach(function(l) { if (l) map.removeLayer(l); });
+                routeLine = selLine = marker = null; sel = null;
+                var latlngs = pts.filter(function(p) { return p[3] !== null; }).map(function(p) { return [p[3], p[4]]; });
+                routeLine = L.polyline(latlngs, { color: '#555', weight: 3, opacity: .7 }).addTo(map);
+                map.invalidateSize();
+                map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+                RouteTools.drawProfile(document.getElementById('ra-new-profile'), pts, {
+                    onHover: function(j) {
+                        if (j === null || pts[j][3] === null) { if (marker) { map.removeLayer(marker); marker = null; } return; }
+                        if (!marker) marker = L.circleMarker([pts[j][3], pts[j][4]], { radius: 5, color: '#000', fillOpacity: 1 }).addTo(map);
+                        marker.setLatLng([pts[j][3], pts[j][4]]);
+                    },
+                    onSelect: select
+                });
+                if (preset.from >= 0 && preset.to > preset.from) {
+                    var a = nearestByIndex(preset.from), b = nearestByIndex(preset.to);
+                    RouteTools.showSelection(a, b);
+                    select(a, b);
+                    if (selLine) map.fitBounds(selLine.getBounds(), { padding: [40, 40] });
+                    preset = { from: -1, to: -1 };
+                }
+            }).fail(function(xhr) {
+                alert((xhr.responseJSON && xhr.responseJSON.error) || 'Die Aktivität konnte nicht geladen werden.');
+            });
+        }
+
+        $('#ra-new-activity').on('change', function() { load(+$(this).val()); });
+        load(+$('#ra-new-activity').val());
+
+        $('#ra-new-save').on('click', function() {
+            if (!sel) return;
+            var $b = $(this).prop('disabled', true);
+            $.post('{{ url('tools-segment-create') }}', {
+                activity: +$('#ra-new-activity').val(),
+                from: pts[sel[0]][0],
+                to: pts[sel[1]][0],
+                name: $('#ra-new-name').val(),
+                only_sport: $('#ra-new-only-sport').is(':checked') ? 1 : 0
+            }).done(function(res) {
+                $('#ajax').loadDiv(res.url);
+            }).fail(function(xhr) {
+                $b.prop('disabled', false);
+                alert((xhr.responseJSON && xhr.responseJSON.error) || 'Fehler beim Anlegen des Segments.');
+            });
+        });
+    })(jQuery);
+    </script>
+{% endblock %}

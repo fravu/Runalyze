@@ -1,0 +1,207 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/route_analysis/_shared.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Heatmap</h1>
+    </div>
+
+    <div class="panel-content">
+        <div id="ra-heat-status" class="ra-progress"><i class="fa fa-spinner fa-spin"></i> Routen werden geladen … Beim ersten Aufruf kann das bei vielen Aktivitäten etwas dauern.</div>
+
+        <div id="ra-heat-controls" style="display:none">
+            <div class="ra-chips" id="ra-heat-sports"></div>
+            <div class="ra-chips">
+                <label>Von <select id="ra-heat-from"></select></label>
+                <label>bis <select id="ra-heat-to"></select></label>
+                <label>Deckkraft <input type="range" id="ra-heat-alpha" min="5" max="80" value="35" style="vertical-align:middle"></label>
+                <span id="ra-heat-info" style="color:#777"></span>
+            </div>
+        </div>
+
+        <div id="ra-heat-map" class="ra-map"></div>
+        <p class="info small">Klick auf die Karte zeigt die Aktivitäten, die dort vorbeikamen. Mausrad zoomt.</p>
+        <div id="ra-heat-hits"></div>
+    </div>
+
+    <script>
+    (function($){
+        var COLORS = ['#d62728', '#2ca02c', '#1f77b4', '#ff7f0e', '#9467bd', '#8c564b', '#e377c2', '#17becf', '#bcbd22', '#7f7f7f'];
+        var data = null, sportColor = {}, sportOn = {}, map = null, layer = null;
+
+        var HeatLayer = L.Class.extend({
+            initialize: function(draw) { this._draw = draw; },
+            onAdd: function(m) {
+                this._map = m;
+                this._canvas = L.DomUtil.create('canvas', 'ra-heat-canvas leaflet-zoom-hide');
+                m.getPanes().overlayPane.appendChild(this._canvas);
+                m.on('moveend resize', this._reset, this);
+                this._reset();
+            },
+            onRemove: function(m) {
+                m.getPanes().overlayPane.removeChild(this._canvas);
+                m.off('moveend resize', this._reset, this);
+            },
+            redraw: function() { if (this._map) this._reset(); },
+            _reset: function() {
+                var size = this._map.getSize();
+                L.DomUtil.setPosition(this._canvas, this._map.containerPointToLayerPoint([0, 0]));
+                this._canvas.width = size.x;
+                this._canvas.height = size.y;
+                this._canvas.style.width = size.x + 'px';
+                this._canvas.style.height = size.y + 'px';
+                this._draw(this._canvas, this._map);
+            }
+        });
+
+        function decodeActivities() {
+            var len = data.precision;
+            data.activities.forEach(function(a) {
+                var p = a.p, lat = [], lng = [], i = 0;
+                var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+                while (i < p.length) {
+                    if (p.charAt(i) === '-') { lat.push(NaN); lng.push(NaN); i++; continue; }
+                    var c = RouteTools.decodeGeohash(p, i, len);
+                    lat.push(c[0]); lng.push(c[1]);
+                    if (c[0] < minLat) minLat = c[0]; if (c[0] > maxLat) maxLat = c[0];
+                    if (c[1] < minLng) minLng = c[1]; if (c[1] > maxLng) maxLng = c[1];
+                    i += len;
+                }
+                a.lat = lat; a.lng = lng; a.box = [minLat, minLng, maxLat, maxLng]; a.proj = {};
+                a.year = new Date(a.t * 1000).getFullYear();
+                delete a.p;
+            });
+        }
+
+        function visible() {
+            var from = +$('#ra-heat-from').val(), to = +$('#ra-heat-to').val();
+            return data.activities.filter(function(a) { return sportOn[a.s] && a.year >= from && a.year <= to; });
+        }
+
+        function projected(a, zoom) {
+            if (!a.proj[zoom]) {
+                var n = a.lat.length, xy = new Float64Array(n * 2);
+                for (var i = 0; i < n; i++) {
+                    if (isNaN(a.lat[i])) { xy[2 * i] = NaN; xy[2 * i + 1] = NaN; continue; }
+                    var pt = map.project([a.lat[i], a.lng[i]], zoom);
+                    xy[2 * i] = pt.x; xy[2 * i + 1] = pt.y;
+                }
+                a.proj[zoom] = xy;
+            }
+            return a.proj[zoom];
+        }
+
+        function offset() {
+            var origin = map.getPixelOrigin(), zero = map.layerPointToContainerPoint([0, 0]);
+            return [zero.x - origin.x, zero.y - origin.y];
+        }
+
+        function draw(canvas, m) {
+            var ctx = canvas.getContext('2d'), zoom = m.getZoom(), off = offset();
+            var bounds = m.getBounds(), acts = visible(), km = 0;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = $('#ra-heat-alpha').val() / 100;
+            ctx.lineWidth = zoom >= 15 ? 3 : 2;
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            acts.forEach(function(a) {
+                km += a.d;
+                var b = a.box;
+                if (b[2] < bounds.getSouth() || b[0] > bounds.getNorth() || b[3] < bounds.getWest() || b[1] > bounds.getEast()) return;
+                var xy = projected(a, zoom), pen = false;
+                ctx.strokeStyle = sportColor[a.s];
+                ctx.beginPath();
+                for (var i = 0; i < xy.length; i += 2) {
+                    if (isNaN(xy[i])) { pen = false; continue; }
+                    var x = xy[i] + off[0], y = xy[i + 1] + off[1];
+                    if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; }
+                }
+                ctx.stroke();
+            });
+            $('#ra-heat-info').text(acts.length + ' Aktivitäten · ' + Math.round(km).toLocaleString('de-DE') + ' km');
+        }
+
+        function initialBounds() {
+            var acts = visible();
+            if (!acts.length) return null;
+            var starts = acts.map(function(a) { return [a.box[0], a.box[1]]; });
+            var mLat = starts.map(function(s) { return s[0]; }).sort(function(a, b) { return a - b; })[Math.floor(starts.length / 2)];
+            var mLng = starts.map(function(s) { return s[1]; }).sort(function(a, b) { return a - b; })[Math.floor(starts.length / 2)];
+            var bounds = null;
+            acts.forEach(function(a) {
+                if (Math.abs(a.box[0] - mLat) > 0.5 || Math.abs(a.box[1] - mLng) > 0.7) return;
+                var bb = L.latLngBounds([a.box[0], a.box[1]], [a.box[2], a.box[3]]);
+                bounds = bounds ? bounds.extend(bb) : bb;
+            });
+            return bounds;
+        }
+
+        function showHits(e) {
+            var zoom = map.getZoom(), off = offset(), cp = map.latLngToContainerPoint(e.latlng), hits = [];
+            var tol = 8, ll = e.latlng, dLat = 0.02, dLng = 0.03;
+            visible().forEach(function(a) {
+                var b = a.box;
+                if (ll.lat < b[0] - dLat || ll.lat > b[2] + dLat || ll.lng < b[1] - dLng || ll.lng > b[3] + dLng) return;
+                var xy = projected(a, zoom);
+                for (var i = 0; i < xy.length; i += 2) {
+                    var dx = xy[i] + off[0] - cp.x, dy = xy[i + 1] + off[1] - cp.y;
+                    if (dx * dx + dy * dy <= tol * tol) { hits.push(a); break; }
+                }
+            });
+            hits.sort(function(a, b) { return b.t - a.t; });
+            var names = {};
+            data.sports.forEach(function(s) { names[s.id] = s.name; });
+            var html = '<table class="fullwidth zebra-style ra-table"><thead><tr><th colspan="4">' + hits.length + ' Aktivitäten an dieser Stelle</th></tr></thead><tbody>';
+            hits.slice(0, 100).forEach(function(a) {
+                var d = new Date(a.t * 1000);
+                html += '<tr class="link" onclick="RouteTools.openActivity(' + a.id + ')"><td>' + d.toLocaleDateString('de-DE') + '</td><td><i class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + sportColor[a.s] + '"></i> ' + (names[a.s] || '') + '</td><td>' + $('<div>').text(a.n || '').html() + '</td><td class="r">' + a.d.toFixed(1).replace('.', ',') + ' km</td></tr>';
+            });
+            if (!hits.length) html += '<tr><td colspan="4"><em>Keine Aktivität innerhalb von ' + tol + ' Pixeln.</em></td></tr>';
+            $('#ra-heat-hits').html(html + '</tbody></table>');
+        }
+
+        function buildControls() {
+            var $sports = $('#ra-heat-sports');
+            data.sports.forEach(function(s, i) {
+                sportColor[s.id] = COLORS[i % COLORS.length];
+                sportOn[s.id] = i < 3;
+                $('<span class="ra-chip"></span>').toggleClass('off', !sportOn[s.id])
+                    .html('<i class="dot" style="background:' + sportColor[s.id] + '"></i>' + $('<div>').text(s.name).html() + ' <small>(' + s.count + ')</small>')
+                    .on('click', function() { sportOn[s.id] = !sportOn[s.id]; $(this).toggleClass('off', !sportOn[s.id]); layer.redraw(); })
+                    .appendTo($sports);
+            });
+            var years = data.activities.map(function(a) { return a.year; });
+            var y0 = Math.min.apply(null, years), y1 = Math.max.apply(null, years);
+            for (var y = y0; y <= y1; y++) {
+                $('#ra-heat-from').append('<option' + (y === y0 ? ' selected' : '') + '>' + y + '</option>');
+                $('#ra-heat-to').append('<option' + (y === y1 ? ' selected' : '') + '>' + y + '</option>');
+            }
+            $('#ra-heat-from, #ra-heat-to').on('change', function() { layer.redraw(); });
+            $('#ra-heat-alpha').on('input change', function() { layer.redraw(); });
+            $('#ra-heat-controls').show();
+        }
+
+        Runalyze.Overlay.setBigSize();
+        map = RouteTools.createMap('ra-heat-map', '{{ layer|e('js') }}');
+        map.setView([51, 10], 6);
+
+        $.getJSON('{{ url('tools-heatmap-data') }}').done(function(json) {
+            data = json;
+            if (!data.activities.length) {
+                $('#ra-heat-status').html('<p class="info">Es gibt noch keine Aktivitäten mit GPS-Daten.</p>');
+                return;
+            }
+            decodeActivities();
+            buildControls();
+            $('#ra-heat-status').hide();
+            var b = initialBounds();
+            if (b) map.fitBounds(b);
+            layer = new HeatLayer(draw);
+            map.addLayer(layer);
+            map.on('click', showHits);
+        }).fail(function(xhr) {
+            $('#ra-heat-status').html('<p class="error">Die Routen konnten nicht geladen werden (' + xhr.status + ' ' + xhr.statusText + ').</p>');
+        });
+    })(jQuery);
+    </script>
+{% endblock %}

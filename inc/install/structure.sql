@@ -846,3 +846,78 @@ ALTER TABLE `runalyze_sport` ADD FOREIGN KEY (`default_typeid`) REFERENCES `runa
 -- Constraints der Tabelle `runalyze_notification`
 --
 ALTER TABLE runalyze_notification ADD CONSTRAINT FK_F99B51889B6B5FBA FOREIGN KEY (account_id) REFERENCES runalyze_account (id) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- climbs and segments (Version20260924100000)
+CREATE TABLE IF NOT EXISTS `runalyze_climb` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `accountid` INT UNSIGNED NOT NULL,
+    `activityid` INT UNSIGNED NOT NULL,
+    `sportid` INT UNSIGNED NOT NULL,
+    `time` INT UNSIGNED NOT NULL,
+    `start_index` INT UNSIGNED NOT NULL,
+    `end_index` INT UNSIGNED NOT NULL,
+    `start_lat` DOUBLE NOT NULL,
+    `start_lng` DOUBLE NOT NULL,
+    `end_lat` DOUBLE NOT NULL,
+    `end_lng` DOUBLE NOT NULL,
+    `distance` DECIMAL(7,3) UNSIGNED NOT NULL,
+    `gain` SMALLINT UNSIGNED NOT NULL,
+    `avg_grade` DECIMAL(4,1) NOT NULL,
+    `max_grade` DECIMAL(4,1) NOT NULL,
+    `score` INT UNSIGNED NOT NULL,
+    `category` VARCHAR(2) NOT NULL,
+    `duration` INT UNSIGNED DEFAULT NULL,
+    `vam` SMALLINT UNSIGNED DEFAULT NULL,
+    `avg_hr` SMALLINT UNSIGNED DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `accountid` (`accountid`, `sportid`),
+    KEY `activityid` (`activityid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `runalyze_climb_scan` (
+    `activityid` INT UNSIGNED NOT NULL,
+    `accountid` INT UNSIGNED NOT NULL,
+    `version` TINYINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`activityid`),
+    KEY `accountid` (`accountid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `runalyze_segment` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `accountid` INT UNSIGNED NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `sportid` INT UNSIGNED DEFAULT NULL,
+    `distance` DECIMAL(7,3) UNSIGNED NOT NULL,
+    `gain` SMALLINT NOT NULL,
+    `avg_grade` DECIMAL(4,1) NOT NULL,
+    `start_lat` DOUBLE NOT NULL,
+    `start_lng` DOUBLE NOT NULL,
+    `end_lat` DOUBLE NOT NULL,
+    `end_lng` DOUBLE NOT NULL,
+    `min_lat` DOUBLE NOT NULL,
+    `min_lng` DOUBLE NOT NULL,
+    `max_lat` DOUBLE NOT NULL,
+    `max_lng` DOUBLE NOT NULL,
+    `polyline` MEDIUMTEXT NOT NULL,
+    `profile` MEDIUMTEXT NOT NULL,
+    `created` INT UNSIGNED NOT NULL,
+    `scanned_until` INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `accountid` (`accountid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `runalyze_segment_effort` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `segmentid` INT UNSIGNED NOT NULL,
+    `accountid` INT UNSIGNED NOT NULL,
+    `activityid` INT UNSIGNED NOT NULL,
+    `time` INT UNSIGNED NOT NULL,
+    `duration` INT UNSIGNED DEFAULT NULL,
+    `start_index` INT UNSIGNED NOT NULL,
+    `end_index` INT UNSIGNED NOT NULL,
+    `avg_hr` SMALLINT UNSIGNED DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `effort` (`segmentid`, `activityid`, `start_index`),
+    KEY `activityid` (`activityid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+

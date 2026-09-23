@@ -1,0 +1,157 @@
+<style>
+    .ra-cat { display:inline-block; min-width:2.2em; text-align:center; border-radius:3px; color:#fff; font-weight:bold; font-size:11px; padding:1px 5px; }
+    .ra-cat-HC { background:#5e0b15; } .ra-cat-1 { background:#a4161a; } .ra-cat-2 { background:#dd5a1a; }
+    .ra-cat-3 { background:#e89b1d; } .ra-cat-4 { background:#9fb83a; } .ra-cat-5 { background:#8a9a8f; }
+    .ra-map { height:480px; margin:5px 0; }
+    .ra-map-small { height:320px; margin:5px 0; }
+    .ra-profile { width:100%; height:200px; display:block; cursor:crosshair; }
+    .ra-profile text { font-size:10px; fill:#777; }
+    .ra-legend span { margin-right:12px; font-size:11px; }
+    .ra-legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:-1px; }
+    .ra-kv { display:flex; flex-wrap:wrap; gap:6px 24px; margin:6px 0 10px; }
+    .ra-kv div strong { display:block; font-size:16px; }
+    .ra-kv div small { color:#888; }
+    .ra-table td.r, .ra-table th.r { text-align:right; }
+    .ra-table tr.link:hover td { background:rgba(0,0,0,.04); }
+    .ra-chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px; }
+    .ra-chip { border:1px solid #ccc; border-radius:12px; padding:2px 10px; cursor:pointer; user-select:none; background:#fff; }
+    .ra-chip.off { opacity:.45; }
+    .ra-chip i.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
+    .ra-progress { padding:8px; }
+    .ra-heat-canvas { pointer-events:none; }
+</style>
+
+<script>
+window.RouteTools = window.RouteTools || (function($){
+    var self = {};
+    var BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+    var MAP = {};
+    for (var b = 0; b < 32; b++) MAP[BASE32.charAt(b)] = b;
+
+    self.decodeGeohash = function(hash, offset, length) {
+        var latMin = -90, latMax = 90, lngMin = -180, lngMax = 180, isLng = true;
+        offset = offset || 0; length = length || hash.length;
+        for (var i = offset; i < offset + length; i++) {
+            var v = MAP[hash.charAt(i)];
+            for (var bit = 4; bit >= 0; bit--) {
+                var set = (v >> bit) & 1, mid;
+                if (isLng) { mid = (lngMin + lngMax) / 2; if (set) lngMin = mid; else lngMax = mid; }
+                else { mid = (latMin + latMax) / 2; if (set) latMin = mid; else latMax = mid; }
+                isLng = !isLng;
+            }
+        }
+        return [(latMin + latMax) / 2, (lngMin + lngMax) / 2];
+    };
+
+    self.createMap = function(id, layerName) {
+        var layers = RunalyzeLeaflet.getNewLayers();
+        var layer = layers[layerName] || layers['OpenStreetMap'] || layers[Object.keys(layers)[0]];
+        var map = L.map(id, { scrollWheelZoom: true }).addLayer(layer);
+        L.control.layers(layers).addTo(map);
+        L.control.scale({ imperial: false }).addTo(map);
+        return map;
+    };
+
+    self.duration = function(s) {
+        if (s === null || s === undefined || s === '') return '–';
+        s = Math.round(s);
+        var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+        return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+    };
+
+    self.gradeColor = function(g) {
+        return g < 0 ? '#9fb3c8' : g < 5 ? '#9fb83a' : g < 10 ? '#e89b1d' : g < 15 ? '#dd5a1a' : '#a4161a';
+    };
+
+    /**
+     * points: [[index, km, elev, lat, lng, time], ...]
+     * options: onHover(pointIndexInArray|null), onSelect(fromArrayIndex, toArrayIndex), selection [a,b]
+     */
+    self.drawProfile = function(svg, points, options) {
+        options = options || {};
+        var W = svg.clientWidth || 700, H = 200, L0 = 44, R = 8, T = 10, B = 22;
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+        var withElev = points.filter(function(p){ return p[2] !== null; });
+        if (withElev.length < 2) { svg.innerHTML = '<text x="10" y="20">Keine Höhendaten vorhanden</text>'; return; }
+        var km0 = points[0][1], km1 = points[points.length - 1][1];
+        var eMin = Infinity, eMax = -Infinity;
+        withElev.forEach(function(p){ eMin = Math.min(eMin, p[2]); eMax = Math.max(eMax, p[2]); });
+        var pad = Math.max(10, (eMax - eMin) * 0.08); eMin -= pad; eMax += pad;
+        var X = function(km){ return L0 + (W - L0 - R) * (km - km0) / Math.max(0.001, km1 - km0); };
+        var Y = function(e){ return T + (H - T - B) * (1 - (e - eMin) / (eMax - eMin)); };
+        var s = '', step = niceStep((eMax - eMin) / 4);
+        for (var v = Math.ceil(eMin / step) * step; v <= eMax; v += step) {
+            s += '<line x1="' + L0 + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#ddd"/><text x="' + (L0 - 4) + '" y="' + (Y(v) + 3) + '" text-anchor="end">' + Math.round(v) + '</text>';
+        }
+        var kmStep = niceStep((km1 - km0) / 6);
+        var labelBase = options.relative ? km0 : 0;
+        for (var k = Math.ceil((km0 - labelBase) / kmStep) * kmStep + labelBase; k <= km1 + 1e-9; k += kmStep) {
+            s += '<text x="' + X(k) + '" y="' + (H - 6) + '" text-anchor="middle">' + (Math.round((k - labelBase) * 100) / 100).toString().replace('.', ',') + ' km</text>';
+        }
+        // grade smoothed over +/- 50 m, neighbouring pieces of the same color are drawn as one polygon
+        var colors = [], lo = 0, hi = 0;
+        for (var i = 0; i < points.length; i++) {
+            while (points[i][1] - points[lo][1] > 0.05) lo++;
+            while (hi + 1 < points.length && points[hi + 1][1] - points[i][1] <= 0.05) hi++;
+            var ea = points[lo][2], eb = points[hi][2], dm = (points[hi][1] - points[lo][1]) * 1000;
+            colors.push(ea === null || eb === null || dm <= 0 ? null : self.gradeColor((eb - ea) / dm * 100));
+        }
+        var runStart = 0;
+        for (var i = 1; i <= points.length; i++) {
+            if (i < points.length && colors[i] === colors[runStart] && points[i][2] !== null) continue;
+            var run = points.slice(runStart, Math.min(i + 1, points.length)).filter(function(p) { return p[2] !== null; });
+            if (run.length > 1 && colors[runStart]) {
+                s += '<polygon points="' + run.map(function(p) { return X(p[1]) + ',' + Y(p[2]); }).join(' ') + ' ' + X(run[run.length - 1][1]) + ',' + Y(eMin) + ' ' + X(run[0][1]) + ',' + Y(eMin) + '" fill="' + colors[runStart] + '" opacity=".85"/>';
+            }
+            runStart = i;
+        }
+        s += '<polyline fill="none" stroke="#333" stroke-width="1.2" points="' + withElev.map(function(p){ return X(p[1]) + ',' + Y(p[2]); }).join(' ') + '"/>';
+        s += '<rect class="ra-sel" x="0" y="' + T + '" width="0" height="' + (H - T - B) + '" fill="rgba(30,90,200,.18)" stroke="rgba(30,90,200,.8)" style="display:none"/>';
+        s += '<line class="ra-hover" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" stroke="#000" stroke-dasharray="3,3" style="display:none"/>';
+        svg.innerHTML = s;
+
+        var hover = svg.querySelector('.ra-hover'), sel = svg.querySelector('.ra-sel');
+        var nearest = function(evt) {
+            var rect = svg.getBoundingClientRect(), x = (evt.clientX - rect.left) * W / rect.width;
+            var km = km0 + (x - L0) / (W - L0 - R) * (km1 - km0), best = 0;
+            for (var j = 1; j < points.length; j++) if (Math.abs(points[j][1] - km) < Math.abs(points[best][1] - km)) best = j;
+            return best;
+        };
+        var showSel = function(a, b) {
+            var x1 = X(points[Math.min(a, b)][1]), x2 = X(points[Math.max(a, b)][1]);
+            sel.setAttribute('x', x1); sel.setAttribute('width', Math.max(1, x2 - x1)); sel.style.display = '';
+        };
+        var dragStart = null;
+        svg.onmousemove = function(evt) {
+            var j = nearest(evt);
+            hover.setAttribute('x1', X(points[j][1])); hover.setAttribute('x2', X(points[j][1])); hover.style.display = '';
+            if (options.onHover) options.onHover(j);
+            if (dragStart !== null && options.onSelect) { showSel(dragStart, j); }
+        };
+        svg.onmouseleave = function() { hover.style.display = 'none'; if (options.onHover) options.onHover(null); };
+        if (options.onSelect) {
+            svg.onmousedown = function(evt) { evt.preventDefault(); dragStart = nearest(evt); };
+            svg.onmouseup = function(evt) {
+                if (dragStart === null) return;
+                var j = nearest(evt), a = Math.min(dragStart, j), b = Math.max(dragStart, j);
+                dragStart = null;
+                if (b > a) { showSel(a, b); options.onSelect(a, b); }
+            };
+        }
+        if (options.selection) showSel(options.selection[0], options.selection[1]);
+        self.showSelection = function(a, b) { showSel(a, b); };
+    };
+
+    function niceStep(raw) {
+        var p = Math.pow(10, Math.floor(Math.log(Math.max(raw, 1e-6)) / Math.LN10)), n = raw / p;
+        return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p;
+    }
+
+    self.openActivity = function(id) {
+        Runalyze.Overlay.close();
+        Runalyze.Training.load(id);
+    };
+
+    return self;
+})(jQuery);
+</script>

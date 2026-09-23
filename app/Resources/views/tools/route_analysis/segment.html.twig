@@ -1,0 +1,137 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/route_analysis/_shared.html.twig' %}
+
+    <div class="panel-menu">
+        <ul>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-segments') }}"><i class="fa fa-chevron-left"></i> Alle Segmente</a></li>
+            <li><span class="link" id="ra-seg-rename">Umbenennen</span></li>
+            <li><span class="link" id="ra-seg-rescan" title="Alle Aktivitäten erneut prüfen">Neu prüfen</span></li>
+            <li><span class="link" id="ra-seg-delete">Löschen</span></li>
+        </ul>
+    </div>
+
+    <div class="panel-heading">
+        <h1>{{ segment.name }}</h1>
+    </div>
+
+    <div class="panel-content">
+        {% if pending > 0 %}
+            <p class="info"><i class="fa fa-spinner fa-spin"></i> Es gibt noch {{ pending }} ungeprüfte Aktivitäten. Die Prüfung läuft in der <a class="ajax" target="ajax" href="{{ url('tools-segments') }}">Segmentliste</a>.</p>
+        {% endif %}
+
+        <div class="ra-kv">
+            <div><strong>{{ segment.distance|number_format(2, ',', '.') }} km</strong><small>Länge</small></div>
+            <div><strong>{{ segment.gain }} m</strong><small>Höhendifferenz</small></div>
+            <div><strong>{{ segment.avg_grade|number_format(1, ',', '.') }} %</strong><small>Ø Steigung</small></div>
+            <div><strong>{{ efforts|length }}</strong><small>Versuche</small></div>
+            <div><strong>{{ efforts is empty or efforts[0].duration is null ? '–' : efforts[0].duration|duration }}</strong><small>Bestzeit</small></div>
+        </div>
+
+        <div id="ra-seg-map" class="ra-map-small"></div>
+        <svg id="ra-seg-profile" class="ra-profile"></svg>
+
+        {% if efforts|length > 1 %}
+            <h3>Zeit pro Versuch</h3>
+            <svg id="ra-seg-chart" class="ra-profile" style="cursor:default"></svg>
+        {% endif %}
+
+        <table class="fullwidth zebra-style ra-table">
+            <thead>
+                <tr><th>#</th><th>Datum</th><th>Sport</th><th class="r">Zeit</th><th class="r">Tempo</th><th class="r">Ø HF</th><th class="r">Rückstand</th></tr>
+            </thead>
+            <tbody>
+                {% for effort in efforts %}
+                    <tr class="link" onclick="RouteTools.openActivity({{ effort.activityid }});" title="Aktivität öffnen">
+                        <td>{{ loop.index }}</td>
+                        <td>{{ effort.time|date('d.m.Y H:i') }}</td>
+                        <td><i class="{{ effort.sporticon }}"></i> {{ effort.sportname }}</td>
+                        <td class="r">{{ effort.duration is null ? '–' : effort.duration|duration }}</td>
+                        <td class="r">
+                            {% if effort.duration %}
+                                {{ (effort.duration / segment.distance)|duration }}/km · {{ (segment.distance / effort.duration * 3600)|number_format(1, ',', '.') }} km/h
+                            {% else %}–{% endif %}
+                        </td>
+                        <td class="r">{{ effort.avg_hr|default('–') }}</td>
+                        <td class="r">{{ loop.first or effort.duration is null or efforts[0].duration is null ? '' : '+' ~ (effort.duration - efforts[0].duration)|duration }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7"><em>Noch keine Versuche gefunden.</em></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+        var polyline = {{ segment.polyline|raw }};
+        var profile = {{ segment.profile|raw }};
+        var efforts = {{ chart|json_encode|raw }};
+        var map = RouteTools.createMap('ra-seg-map', '{{ layer|e('js') }}'), marker = null;
+        var line = L.polyline(polyline, { color: '#1f5fa8', weight: 5 }).addTo(map);
+        L.circleMarker(polyline[0], { radius: 6, color: '#2e7d4f', fillOpacity: 1 }).addTo(map).bindPopup('Start');
+        L.circleMarker(polyline[polyline.length - 1], { radius: 6, color: '#a4161a', fillOpacity: 1 }).addTo(map).bindPopup('Ende');
+        map.fitBounds(line.getBounds(), { padding: [20, 20] });
+
+        if (profile.length > 1) {
+            var pts = profile.map(function(p, i) {
+                var k = Math.round(i / (profile.length - 1) * (polyline.length - 1));
+                return [i, p[0], p[1], polyline[k][0], polyline[k][1], null];
+            });
+            RouteTools.drawProfile(document.getElementById('ra-seg-profile'), pts, {
+                onHover: function(j) {
+                    if (j === null) { if (marker) { map.removeLayer(marker); marker = null; } return; }
+                    if (!marker) marker = L.circleMarker([pts[j][3], pts[j][4]], { radius: 5, color: '#000', fillOpacity: 1 }).addTo(map);
+                    marker.setLatLng([pts[j][3], pts[j][4]]);
+                }
+            });
+        } else {
+            $('#ra-seg-profile').hide();
+        }
+
+        var chart = document.getElementById('ra-seg-chart');
+        var timed = efforts.filter(function(e) { return e[1] !== null; }).sort(function(a, b) { return a[0] - b[0]; });
+        if (chart && timed.length > 1) {
+            var W = chart.clientWidth || 700, H = 200, L0 = 50, R = 12, T = 12, B = 24;
+            chart.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+            var t0 = timed[0][0], t1 = timed[timed.length - 1][0];
+            var dMin = Math.min.apply(null, timed.map(function(e) { return e[1]; })), dMax = Math.max.apply(null, timed.map(function(e) { return e[1]; }));
+            var pad = Math.max(5, (dMax - dMin) * 0.1); dMin -= pad; dMax += pad;
+            var X = function(t) { return L0 + (W - L0 - R) * (t - t0) / Math.max(1, t1 - t0); };
+            var Y = function(d) { return T + (H - T - B) * (d - dMin) / (dMax - dMin); };
+            var s = '';
+            for (var k = 0; k <= 3; k++) {
+                var d = dMin + (dMax - dMin) * k / 3;
+                s += '<line x1="' + L0 + '" x2="' + (W - R) + '" y1="' + Y(d) + '" y2="' + Y(d) + '" stroke="#ddd"/><text x="' + (L0 - 4) + '" y="' + (Y(d) + 3) + '" text-anchor="end">' + RouteTools.duration(d) + '</text>';
+            }
+            var y0 = new Date(t0 * 1000).getFullYear(), y1 = new Date(t1 * 1000).getFullYear();
+            for (var y = y0; y <= y1; y++) {
+                var ty = new Date(y, 0, 1).getTime() / 1000;
+                if (ty >= t0 && ty <= t1) s += '<line x1="' + X(ty) + '" x2="' + X(ty) + '" y1="' + T + '" y2="' + (H - B) + '" stroke="#eee"/><text x="' + X(ty) + '" y="' + (H - 6) + '" text-anchor="middle">' + y + '</text>';
+            }
+            s += '<polyline fill="none" stroke="#1f5fa8" stroke-width="1.5" points="' + timed.map(function(e) { return X(e[0]) + ',' + Y(e[1]); }).join(' ') + '"/>';
+            var best = timed.reduce(function(m, e) { return e[1] < m[1] ? e : m; }, timed[0]);
+            timed.forEach(function(e) {
+                var isBest = e === best;
+                s += '<circle cx="' + X(e[0]) + '" cy="' + Y(e[1]) + '" r="' + (isBest ? 5 : 3) + '" fill="' + (isBest ? '#1f5fa8' : '#fff') + '" stroke="#1f5fa8" stroke-width="1.5"><title>' + new Date(e[0] * 1000).toLocaleDateString('de-DE') + ': ' + RouteTools.duration(e[1]) + '</title></circle>';
+            });
+            chart.innerHTML = s;
+        }
+
+        var action = function(name, data, confirmText) {
+            if (confirmText && !window.confirm(confirmText)) return;
+            $.post('{{ url('tools-segment-action', {'id': segment.id, 'action': 'delete'}) }}'.replace(/delete$/, name), data || {}).done(function() {
+                $('#ajax').loadDiv(name === 'delete' ? '{{ url('tools-segments') }}' : (name === 'rescan' ? '{{ url('tools-segments') }}' : '{{ url('tools-segment', {'id': segment.id}) }}'));
+            });
+        };
+        $('#ra-seg-rename').on('click', function() {
+            var name = window.prompt('Neuer Name', {{ segment.name|json_encode|raw }});
+            if (name) action('rename', { name: name });
+        });
+        $('#ra-seg-rescan').on('click', function() { action('rescan', {}, 'Alle Versuche verwerfen und alle Aktivitäten neu prüfen?'); });
+        $('#ra-seg-delete').on('click', function() { action('delete', {}, 'Segment wirklich löschen?'); });
+    })(jQuery);
+    </script>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/route_analysis/_shared.html.twig' %}
+
+    <div class="panel-menu">
+        <ul>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-segments') }}">Segmente</a></li>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-heatmap') }}">Heatmap</a></li>
+        </ul>
+    </div>
+
+    <div class="panel-heading">
+        <h1>Anstiege</h1>
+    </div>
+
+    <div class="panel-content">
+        {% if pending > 0 %}
+            <div id="ra-climb-scan" class="ra-progress info">
+                <i class="fa fa-spinner fa-spin"></i>
+                Analysiere Aktivitäten: noch <strong id="ra-climb-pending">{{ pending }}</strong> …
+                Das Fenster kann offen bleiben, es geht automatisch weiter.
+            </div>
+        {% endif %}
+
+        <form id="ra-climb-filter" class="ra-chips" onsubmit="return false;">
+            <select name="sport">
+                <option value="0">Alle Sportarten</option>
+                {% for sport in sports %}
+                    <option value="{{ sport.id }}"{% if filter.sport == sport.id %} selected{% endif %}>{{ sport.name }} ({{ sport.num }})</option>
+                {% endfor %}
+            </select>
+            <select name="year">
+                <option value="0">Alle Jahre</option>
+                {% for year in years %}
+                    <option value="{{ year }}"{% if filter.year == year %} selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+            <select name="category">
+                <option value="">Alle Kategorien</option>
+                {% for cat in ['HC', '1', '2', '3', '4', '5'] %}
+                    <option value="{{ cat }}"{% if filter.category == cat %} selected{% endif %}>{{ cat == 'HC' ? 'HC' : 'Kategorie ' ~ cat }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <table class="fullwidth zebra-style ra-table">
+            <thead>
+                <tr>
+                    <th>Kat.</th>
+                    <th>Anstieg</th>
+                    <th>Sport</th>
+                    <th class="r">Länge</th>
+                    <th class="r">Höhe</th>
+                    <th class="r">Ø / max</th>
+                    <th class="r">Score</th>
+                    <th class="r">Bestzeit</th>
+                    <th class="r" title="Höhenmeter pro Stunde bei der Bestzeit">VAM</th>
+                    <th class="r" title="Wie oft">×</th>
+                    <th class="r">Zuletzt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in groups %}
+                    <tr class="link" onclick="$('#ajax').loadDiv('{{ url('tools-climb', {'id': group.id}) }}');">
+                        <td><span class="ra-cat ra-cat-{{ group.category }}">{{ group.category }}</span></td>
+                        <td>{{ group.name|default('–') }}</td>
+                        <td>{% for sport in group.sports %}<i class="{{ sport.icon }}" title="{{ sport.name }}"></i> {% endfor %}</td>
+                        <td class="r">{{ group.distance|number_format(2, ',', '.') }} km</td>
+                        <td class="r">{{ group.gain }} m</td>
+                        <td class="r">{{ group.avg_grade|number_format(1, ',', '.') }} / {{ group.max_grade|number_format(0, ',', '.') }} %</td>
+                        <td class="r">{{ group.score|number_format(0, ',', '.') }}</td>
+                        <td class="r">{{ group.best_duration is null ? '–' : group.best_duration|duration }}</td>
+                        <td class="r">{{ group.best_vam|default('–') }}</td>
+                        <td class="r">{{ group.count }}</td>
+                        <td class="r">{{ group.last|date('d.m.Y') }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="11"><em>{% if pending > 0 %}Die Analyse läuft noch.{% else %}Keine Anstiege gefunden.{% endif %}</em></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p class="info small">
+            Erkannt wird jeder Anstieg ab 300 m Länge, 3 % Steigung und 20 Hm. Score = Länge (m) × Ø-Steigung (%).
+            Kategorien für Rad ab Score 4.000 (5), 8.000 (4), 16.000 (3), 32.000 (2), 64.000 (1), 80.000 (HC); für Laufen, Wandern und alle anderen Sportarten gelten die halben Werte.
+            VAM = Höhenmeter pro Stunde. Gleiche Anstiege aus verschiedenen Aktivitäten werden zusammengefasst, wenn Start und Ende weniger als 75 m auseinanderliegen.
+        </p>
+        <p class="c"><input type="button" id="ra-climb-reset" value="Alle Anstiege neu berechnen"></p>
+    </div>
+
+    <script>
+    (function($){
+        var baseUrl = '{{ url('tools-climbs') }}';
+
+        Runalyze.Overlay.setBigSize();
+
+        $('#ra-climb-filter select').on('change', function() {
+            $('#ajax').loadDiv(baseUrl + '?' + $('#ra-climb-filter').serialize());
+        });
+
+        $('#ra-climb-reset').on('click', function() {
+            $(this).prop('disabled', true);
+            $.post('{{ url('tools-climbs-reset') }}').always(function() { $('#ajax').loadDiv(baseUrl); });
+        });
+
+        {% if pending > 0 %}
+        (function scan() {
+            if (!$('#ra-climb-scan').length) return;
+            $.post('{{ url('tools-climbs-scan') }}').done(function(res) {
+                if (!$('#ra-climb-scan').length) return;
+                if (res.pending > 0) {
+                    $('#ra-climb-pending').text(res.pending);
+                    scan();
+                } else {
+                    $('#ajax').loadDiv(baseUrl + '?' + $('#ra-climb-filter').serialize());
+                }
+            }).fail(function(xhr) {
+                $('#ra-climb-scan').removeClass('info').addClass('error').text('Analyse abgebrochen: ' + xhr.status + ' ' + xhr.statusText);
+            });
+        })();
+        {% endif %}
+    })(jQuery);
+    </script>
+{% endblock %}

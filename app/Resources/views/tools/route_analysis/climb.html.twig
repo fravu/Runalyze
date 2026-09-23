@@ -1,0 +1,103 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/route_analysis/_shared.html.twig' %}
+
+    <div class="panel-menu">
+        <ul>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-climbs') }}"><i class="fa fa-chevron-left"></i> Alle Anstiege</a></li>
+        </ul>
+    </div>
+
+    <div class="panel-heading">
+        <h1><span class="ra-cat ra-cat-{{ group.category }}">{{ group.category }}</span> {{ group.name|default('Anstieg') }}</h1>
+    </div>
+
+    <div class="panel-content">
+        <div class="ra-kv">
+            <div><strong>{{ group.distance|number_format(2, ',', '.') }} km</strong><small>Länge</small></div>
+            <div><strong>{{ group.gain }} m</strong><small>Höhenmeter</small></div>
+            <div><strong>{{ group.avg_grade|number_format(1, ',', '.') }} %</strong><small>Ø Steigung</small></div>
+            <div><strong>{{ group.max_grade|number_format(0, ',', '.') }} %</strong><small>max. Steigung (100 m)</small></div>
+            <div><strong>{{ group.score|number_format(0, ',', '.') }}</strong><small>Climb Score</small></div>
+            <div><strong>{{ group.count }}×</strong><small>gemacht</small></div>
+        </div>
+
+        <svg id="ra-climb-profile" class="ra-profile"></svg>
+        <div class="ra-legend">
+            <span><i style="background:#9fb83a"></i>&lt; 5 %</span><span><i style="background:#e89b1d"></i>5–10 %</span>
+            <span><i style="background:#dd5a1a"></i>10–15 %</span><span><i style="background:#a4161a"></i>&gt; 15 %</span>
+            <span style="color:#888">Profil der Aktivität vom {{ reference.time|date('d.m.Y') }}</span>
+        </div>
+
+        <div id="ra-climb-map" class="ra-map-small"></div>
+
+        <table class="fullwidth zebra-style ra-table">
+            <thead>
+                <tr><th>#</th><th>Datum</th><th>Sport</th><th class="r">Zeit</th><th class="r">VAM</th><th class="r">Ø HF</th><th class="r">Länge</th><th class="r">Höhe</th></tr>
+            </thead>
+            <tbody>
+                {% for climb in ranked %}
+                    <tr class="link" onclick="RouteTools.openActivity({{ climb.activityid }});" title="Aktivität öffnen">
+                        <td>{{ loop.index }}</td>
+                        <td>{{ climb.time|date('d.m.Y H:i') }}</td>
+                        <td><i class="{{ climb.sporticon }}"></i> {{ climb.sportname }}</td>
+                        <td class="r">{{ climb.duration is null ? '–' : climb.duration|duration }}</td>
+                        <td class="r">{{ climb.vam|default('–') }}</td>
+                        <td class="r">{{ climb.avg_hr|default('–') }}</td>
+                        <td class="r">{{ climb.distance|number_format(2, ',', '.') }} km</td>
+                        <td class="r">{{ climb.gain }} m</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p class="c">
+            <input type="button" id="ra-climb-to-segment" value="Als Segment speichern">
+            <a class="ajax" target="ajax" href="{{ url('tools-segment-new', {'activity': reference.activityid, 'from': reference.start_index, 'to': reference.end_index}) }}">Abschnitt anpassen …</a>
+        </p>
+        <p class="info small">Als Segment werden künftig alle Aktivitäten auf diesem Abschnitt verglichen, unabhängig davon, ob die Anstiegserkennung sie findet.</p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+        var map = RouteTools.createMap('ra-climb-map', '{{ layer|e('js') }}');
+        var marker = null;
+
+        $.getJSON('{{ url('tools-route-track', {'activityId': reference.activityid}) }}', { from: {{ reference.start_index }}, to: {{ reference.end_index }}, max: 400 }).done(function(track) {
+            var pts = track.points, latlngs = pts.filter(function(p) { return p[3] !== null; }).map(function(p) { return [p[3], p[4]]; });
+            if (latlngs.length) {
+                var line = L.polyline(latlngs, { color: '#a4161a', weight: 4 }).addTo(map);
+                L.circleMarker(latlngs[0], { radius: 6, color: '#2e7d4f', fillOpacity: 1 }).addTo(map).bindPopup('Start');
+                L.circleMarker(latlngs[latlngs.length - 1], { radius: 6, color: '#a4161a', fillOpacity: 1 }).addTo(map).bindPopup('Ende');
+                map.fitBounds(line.getBounds(), { padding: [20, 20] });
+            }
+            RouteTools.drawProfile(document.getElementById('ra-climb-profile'), pts, {
+                relative: true,
+                onHover: function(j) {
+                    if (j === null || pts[j][3] === null) { if (marker) { map.removeLayer(marker); marker = null; } return; }
+                    if (!marker) marker = L.circleMarker([pts[j][3], pts[j][4]], { radius: 5, color: '#000', fillOpacity: 1 }).addTo(map);
+                    marker.setLatLng([pts[j][3], pts[j][4]]);
+                }
+            });
+        });
+
+        $('#ra-climb-to-segment').on('click', function() {
+            var $b = $(this).prop('disabled', true);
+            $.post('{{ url('tools-segment-create') }}', {
+                activity: {{ reference.activityid }},
+                from: {{ reference.start_index }},
+                to: {{ reference.end_index }},
+                name: {{ group.name|default('Anstieg')|json_encode|raw }},
+                only_sport: 1
+            }).done(function(res) {
+                $('#ajax').loadDiv(res.url);
+            }).fail(function(xhr) {
+                $b.prop('disabled', false);
+                alert((xhr.responseJSON && xhr.responseJSON.error) || 'Fehler beim Anlegen des Segments.');
+            });
+        });
+    })(jQuery);
+    </script>
+{% endblock %}
