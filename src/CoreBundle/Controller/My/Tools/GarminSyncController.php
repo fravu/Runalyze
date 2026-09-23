@@ -7,6 +7,7 @@ use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
@@ -198,15 +199,25 @@ class GarminSyncController extends Controller
     }
 
     /**
+     * Returns JSON rather than redirecting: activity-upload and everything
+     * it can lead to (the multi editor) are built to be loaded via AJAX
+     * into the app's already-open overlay, not visited as a standalone
+     * page - their own JavaScript assumes that overlay (and the objects
+     * Runalyze.Overlay.init() sets up for it) already exists, which is
+     * only true if this page's own script hands off to it with
+     * $("#ajax").loadDiv(...), the same way the regular multi-file browser
+     * upload does. A plain HTTP redirect instead lands the user on a
+     * broken, un-navigable page.
+     *
      * @Route("/my/tools/garmin-sync/run", name="tools-garmin-sync-run")
      * @Security("has_role('ROLE_USER')")
      */
     public function runAction(Account $account)
     {
-        if (!$this->isConnected($account)) {
-            $this->addFlash('error', $this->get('translator')->trans('Please connect your Garmin Connect account first.'));
+        $trans = $this->get('translator');
 
-            return $this->redirectToRoute('tools-garmin-sync');
+        if (!$this->isConnected($account)) {
+            return new JsonResponse(['error' => $trans->trans('Please connect your Garmin Connect account first.')]);
         }
 
         $downloadDir = $this->getParameter('data_directory').'/import/garmin_sync/'.$account->getId();
@@ -216,6 +227,7 @@ class GarminSyncController extends Controller
         // timeout right after finishing downloads) before fetching
         // anything new, so nothing already downloaded is ever lost.
         $pending = $this->moveIntoImportQueue($downloadDir);
+        $info = null;
 
         if (empty($pending)) {
             (new Filesystem())->mkdir($downloadDir);
@@ -235,11 +247,9 @@ class GarminSyncController extends Controller
             $result = $this->runProcess($process);
 
             if ('ok' !== $result['status']) {
-                $this->addFlash('error', $this->get('translator')->trans('Garmin sync failed: %reason%', [
+                return new JsonResponse(['error' => $trans->trans('Garmin sync failed: %reason%', [
                     '%reason%' => $result['message'] ?? 'unknown error',
-                ]));
-
-                return $this->redirectToRoute('tools-garmin-sync');
+                ])]);
             }
 
             $pending = $this->moveIntoImportQueue($downloadDir);
@@ -252,26 +262,36 @@ class GarminSyncController extends Controller
                 $this->confRepository()->updateOrInsert($account, self::CONF_CATEGORY, self::CONF_LAST_SYNC, (string)$result['resume_epoch']);
             }
 
+            $messages = [];
+
             if (!empty($result['errors'])) {
-                $this->addFlash('error', $this->get('translator')->trans('%count% activities could not be downloaded, see server log for details.', [
+                $messages[] = $trans->trans('%count% activities could not be downloaded, see server log for details.', [
                     '%count%' => count($result['errors']),
-                ]));
+                ]);
             }
 
             if (!empty($result['more_available'])) {
-                $this->addFlash('info', $this->get('translator')->trans('There are more activities left to sync (capped at %max% per click) - click "Sync now" again once you are done here to continue.', [
+                $messages[] = $trans->trans('There are more activities left to sync (capped at %max% per click) - click "Sync now" again once you are done here to continue.', [
                     '%max%' => self::MAX_ACTIVITIES_PER_RUN,
-                ]));
+                ]);
             }
+
+            $info = empty($messages) ? null : implode(' ', $messages);
         }
 
         if (empty($pending)) {
-            $this->addFlash('success', $this->get('translator')->trans('No new activities found on Garmin Connect.'));
-
-            return $this->redirectToRoute('tools-garmin-sync');
+            return new JsonResponse([
+                'success' => true,
+                'files' => [],
+                'message' => $trans->trans('No new activities found on Garmin Connect.'),
+            ]);
         }
 
-        return $this->redirectToRoute('activity-upload', ['files' => implode(';', $pending)]);
+        return new JsonResponse([
+            'success' => true,
+            'files' => $pending,
+            'info' => $info,
+        ]);
     }
 
     /**

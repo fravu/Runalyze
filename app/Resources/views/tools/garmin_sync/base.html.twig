@@ -25,9 +25,55 @@
                 {% endif %}
             </p>
 
-            <form method="post" action="{{ url('tools-garmin-sync-run') }}" class="c">
-                <input type="submit" class="submit" value="{% trans %}Sync now{% endtrans %}">
-            </form>
+            <div id="garmin-sync-messages"></div>
+
+            <p class="c">
+                <input type="button" id="garmin-sync-run" class="submit" value="{% trans %}Sync now{% endtrans %}">
+            </p>
+
+            <script>
+                (function($){
+                    var $button = $('#garmin-sync-run');
+                    var $messages = $('#garmin-sync-messages');
+                    var runningLabel = '{{ 'Syncing...'|trans|e('js') }}';
+                    var defaultLabel = $button.val();
+
+                    $button.click(function(){
+                        $button.prop('disabled', true).val(runningLabel);
+                        $messages.empty();
+
+                        $.ajax({
+                            url: '{{ url('tools-garmin-sync-run') }}',
+                            method: 'POST',
+                            dataType: 'json'
+                        }).done(function(data){
+                            if (data.error) {
+                                $messages.append('<p class="error">'+data.error+'</p>');
+                                $button.prop('disabled', false).val(defaultLabel);
+                            } else if (data.files && data.files.length) {
+                                // Same hand-off the regular multi-file upload
+                                // uses: load the file-picker/preview page into
+                                // the already-open overlay via AJAX, instead
+                                // of navigating there directly (that page's
+                                // own script assumes it is loaded this way).
+                                $("#ajax").loadDiv('{{ url('activity-upload') }}?files='+encodeURIComponent(data.files.join(';')));
+                            } else {
+                                if (data.message) {
+                                    $messages.append('<p class="text">'+data.message+'</p>');
+                                }
+                                $button.prop('disabled', false).val(defaultLabel);
+                            }
+
+                            if (data.info) {
+                                $messages.append('<p class="info">'+data.info+'</p>');
+                            }
+                        }).fail(function(){
+                            $messages.append('<p class="error">{{ 'The request failed.'|trans|e('js') }}</p>');
+                            $button.prop('disabled', false).val(defaultLabel);
+                        });
+                    });
+                })(jQuery);
+            </script>
 
             <div class="panel-heading panel-sub-heading">
                 <h1>{% trans %}Skip older activities{% endtrans %}</h1>
