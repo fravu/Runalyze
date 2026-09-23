@@ -1296,9 +1296,27 @@ class Training implements IdentifiableEntityInterface, AccountRelatedEntityInter
      */
     public function setVO2max($vo2max)
     {
-        $this->vo2max = $vo2max;
+        $this->vo2max = $this->vo2maxOrNullIfUnstorable($vo2max);
 
         return $this;
+    }
+
+    /**
+     * The vo2max columns are DECIMAL(5,2) UNSIGNED. Activities that aren't
+     * really running (e.g. a motorcycle ride recorded with a watch) can
+     * produce absurd calculated values beyond that range, which makes the
+     * whole INSERT fail. Such a value is meaningless anyway, so drop it.
+     *
+     * @param null|float $value
+     * @return null|float
+     */
+    private function vo2maxOrNullIfUnstorable($value)
+    {
+        if (null === $value || (is_numeric($value) && $value >= 0 && $value <= 999.99)) {
+            return $value;
+        }
+
+        return null;
     }
 
     /**
@@ -1316,7 +1334,7 @@ class Training implements IdentifiableEntityInterface, AccountRelatedEntityInter
      */
     public function setVO2maxByTime($vo2maxByTime)
     {
-        $this->vo2maxByTime = $vo2maxByTime;
+        $this->vo2maxByTime = $this->vo2maxOrNullIfUnstorable($vo2maxByTime);
 
         return $this;
     }
@@ -1336,7 +1354,7 @@ class Training implements IdentifiableEntityInterface, AccountRelatedEntityInter
      */
     public function setVO2maxWithElevation($vo2maxWithElevation)
     {
-        $this->vo2maxWithElevation = $vo2maxWithElevation;
+        $this->vo2maxWithElevation = $this->vo2maxOrNullIfUnstorable($vo2maxWithElevation);
 
         return $this;
     }
