@@ -24,8 +24,24 @@ class UtilityExtension extends \Twig_Extension
         return array(
             new \Twig_SimpleFilter('duration', array($this, 'duration')),
             new \Twig_SimpleFilter('filesize', array($this, 'filesizeAsString')),
-            new \Twig_SimpleFilter('md5', array($this, 'md5'))
+            new \Twig_SimpleFilter('md5', array($this, 'md5')),
+            new \Twig_SimpleFilter('file_version', array($this, 'fileVersion'))
         );
+    }
+
+    /**
+     * Cache buster for files below web/: changes whenever the file changes,
+     * so browsers never keep running an outdated script after an update.
+     *
+     * @param string $webPath path relative to web/, e.g. 'assets/js/scripts.min.js'
+     * @param string $fallback
+     * @return string
+     */
+    public function fileVersion($webPath, $fallback = '')
+    {
+        $mtime = @filemtime(__DIR__.'/../../../web/'.ltrim($webPath, '/'));
+
+        return false !== $mtime ? (string)$mtime : (string)$fallback;
     }
 
     /**

@@ -8,7 +8,7 @@
 
     <script data-pace-options='{"ajax": {"ignoreURLs": ["_internal/notifications", "_wdt/"]}, "document": true }' src="vendor/pace/pace.min.js"></script>
 
-    <link rel="stylesheet" href="assets/css/runalyze-style.css?v=<?php echo RUNALYZE_VERSION; ?>">
+    <link rel="stylesheet" href="assets/css/runalyze-style.css?v=<?php echo @filemtime(__DIR__.'/../../web/assets/css/runalyze-style.css') ?: RUNALYZE_VERSION; ?>">
 
 	<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 	<link rel="manifest" href="assets/appmanifest.json">
@@ -18,7 +18,7 @@
 	<title>RUNALYZE</title>
 
     <script>document.addEventListener("touchstart", function(){}, true);</script>
-    <script src="assets/js/scripts.min.js?v=<?php echo RUNALYZE_VERSION; ?>"></script>
+    <script src="assets/js/scripts.min.js?v=<?php echo @filemtime(__DIR__.'/../../web/assets/js/scripts.min.js') ?: RUNALYZE_VERSION; ?>"></script>
 </head>
 
 <body id="home" style="background-image:url(<?php echo \Runalyze\Configuration::Design()->backgroundImage(); ?>);">

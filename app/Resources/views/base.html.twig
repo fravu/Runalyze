@@ -14,7 +14,7 @@
 
         {% block html_head_links %}
             {% block html_head_styles %}
-                <link rel="stylesheet" href="{{ asset('assets/css/runalyze-style.css') }}?v={{ RUNALYZE_VERSION }}">
+                <link rel="stylesheet" href="{{ asset('assets/css/runalyze-style.css') }}?v={{ 'assets/css/runalyze-style.css'|file_version(RUNALYZE_VERSION) }}">
             {% endblock %}
 
             <link rel="shortcut icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
@@ -44,7 +44,7 @@
 
         {% block html_head_scripts %}
             <script>document.addEventListener("touchstart", function(){}, true);</script>
-            <script src="{{ asset('assets/js/scripts.min.js') }}?v={{ RUNALYZE_VERSION }}"></script>
+            <script src="{{ asset('assets/js/scripts.min.js') }}?v={{ 'assets/js/scripts.min.js'|file_version(RUNALYZE_VERSION) }}"></script>
         {% endblock %}
 
     </head>

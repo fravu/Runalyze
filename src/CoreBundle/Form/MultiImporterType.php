@@ -18,6 +18,7 @@ class MultiImporterType extends AbstractType
         $builder->add('show_multi_editor', CheckboxType::class, [
             'required' => false,
             'mapped' => false,
+            'data' => true,
             'label' => 'Show multi editor afterwards'
         ]);
 

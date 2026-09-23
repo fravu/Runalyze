@@ -219,7 +219,7 @@ class CreateController extends Controller
 
             $this->get('app.automatic_reload_flag_setter')->set(AutomaticReloadFlagSetter::FLAG_ALL);
 
-            if ($form->get('show_multi_editor')->getData()) {
+            if ($form->get('show_multi_editor')->getData() && !empty($activityIds)) {
                 return $this->redirectToRoute('multi-editor', ['ids' => implode(',', $activityIds)]);
             }
 

@@ -5,5 +5,9 @@
 
     {% if app.request.xmlHttpRequest %}
         <script>Runalyze.Overlay.close();</script>
+    {% else %}
+        {# Form was submitted without AJAX (e.g. outdated cached script): don't leave the user on a dead end #}
+        <p class="text"><a href="{{ path('dashboard') }}">{% trans %}Back{% endtrans %}</a></p>
+        <script>setTimeout(function(){ window.location.href = '{{ path('dashboard') }}'; }, 1500);</script>
     {% endif %}
 {% endblock %}
