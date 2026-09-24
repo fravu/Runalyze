@@ -70,9 +70,9 @@
         var profile = {{ segment.profile|raw }};
         var efforts = {{ chart|json_encode|raw }};
         var map = RouteTools.createMap('ra-seg-map', '{{ layer|e('js') }}'), marker = null;
-        var line = L.polyline(polyline, { color: '#1f5fa8', weight: 5 }).addTo(map);
-        L.circleMarker(polyline[0], { radius: 6, color: '#2e7d4f', fillOpacity: 1 }).addTo(map).bindPopup('Start');
-        L.circleMarker(polyline[polyline.length - 1], { radius: 6, color: '#a4161a', fillOpacity: 1 }).addTo(map).bindPopup('Ende');
+        var line = L.polyline(polyline, { color: RouteTools.color.line, weight: 5, opacity: 1 }).addTo(map);
+        RouteTools.startMarker(polyline[0]).addTo(map);
+        RouteTools.endMarker(polyline[polyline.length - 1]).addTo(map);
         map.fitBounds(line.getBounds(), { padding: [20, 20] });
 
         if (profile.length > 1) {
@@ -111,11 +111,11 @@
                 var ty = new Date(y, 0, 1).getTime() / 1000;
                 if (ty >= t0 && ty <= t1) s += '<line x1="' + X(ty) + '" x2="' + X(ty) + '" y1="' + T + '" y2="' + (H - B) + '" stroke="#eee"/><text x="' + X(ty) + '" y="' + (H - 6) + '" text-anchor="middle">' + y + '</text>';
             }
-            s += '<polyline fill="none" stroke="#1f5fa8" stroke-width="1.5" points="' + timed.map(function(e) { return X(e[0]) + ',' + Y(e[1]); }).join(' ') + '"/>';
+            s += '<polyline fill="none" stroke="#0047b3" stroke-width="2" points="' + timed.map(function(e) { return X(e[0]) + ',' + Y(e[1]); }).join(' ') + '"/>';
             var best = timed.reduce(function(m, e) { return e[1] < m[1] ? e : m; }, timed[0]);
             timed.forEach(function(e) {
                 var isBest = e === best;
-                s += '<circle cx="' + X(e[0]) + '" cy="' + Y(e[1]) + '" r="' + (isBest ? 5 : 3) + '" fill="' + (isBest ? '#1f5fa8' : '#fff') + '" stroke="#1f5fa8" stroke-width="1.5"><title>' + new Date(e[0] * 1000).toLocaleDateString('de-DE') + ': ' + RouteTools.duration(e[1]) + '</title></circle>';
+                s += '<circle cx="' + X(e[0]) + '" cy="' + Y(e[1]) + '" r="' + (isBest ? 5 : 3) + '" fill="' + (isBest ? '#ffd000' : '#fff') + '" stroke="#000" stroke-width="1.5"><title>' + new Date(e[0] * 1000).toLocaleDateString('de-DE') + ': ' + RouteTools.duration(e[1]) + '</title></circle>';
             });
             chart.innerHTML = s;
         }

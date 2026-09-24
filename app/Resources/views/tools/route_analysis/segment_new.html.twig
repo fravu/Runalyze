@@ -24,7 +24,7 @@
         </p>
 
         <div id="ra-new-work" style="display:none">
-            <p class="info small">Im Höhenprofil mit gedrückter Maustaste den Abschnitt markieren. Die Auswahl erscheint blau auf der Karte.</p>
+            <p class="info small">Im Höhenprofil mit gedrückter Maustaste den Abschnitt markieren. Die Auswahl erscheint gelb-orange auf der Karte.</p>
             <svg id="ra-new-profile" class="ra-profile"></svg>
             <div id="ra-new-map" class="ra-map-small"></div>
 
@@ -54,7 +54,7 @@
             sel = [a, b];
             var latlngs = pts.slice(a, b + 1).filter(function(p) { return p[3] !== null; }).map(function(p) { return [p[3], p[4]]; });
             if (selLine) map.removeLayer(selLine);
-            selLine = latlngs.length ? L.polyline(latlngs, { color: '#1f5fa8', weight: 6 }).addTo(map) : null;
+            selLine = latlngs.length ? L.polyline(latlngs, { color: RouteTools.color.selection, weight: 7, opacity: 1 }).addTo(map) : null;
             var km = pts[b][1] - pts[a][1], gain = (pts[a][2] !== null && pts[b][2] !== null) ? pts[b][2] - pts[a][2] : null;
             $('#ra-new-stats').html(
                 '<div><strong>' + km.toFixed(2).replace('.', ',') + ' km</strong><small>Länge</small></div>' +
@@ -76,7 +76,7 @@
                 [routeLine, selLine, marker].forEach(function(l) { if (l) map.removeLayer(l); });
                 routeLine = selLine = marker = null; sel = null;
                 var latlngs = pts.filter(function(p) { return p[3] !== null; }).map(function(p) { return [p[3], p[4]]; });
-                routeLine = L.polyline(latlngs, { color: '#555', weight: 3, opacity: .7 }).addTo(map);
+                routeLine = L.polyline(latlngs, { color: RouteTools.color.line, weight: 3, opacity: .8 }).addTo(map);
                 map.invalidateSize();
                 map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
                 RouteTools.drawProfile(document.getElementById('ra-new-profile'), pts, {

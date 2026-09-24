@@ -5,6 +5,7 @@ namespace Runalyze\Bundle\CoreBundle\Controller\My\Tools;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Climb\ClimbStore;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Geo\GeoUtil;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Heatmap\HeatmapData;
+use Runalyze\Bundle\CoreBundle\Component\Tool\RouteAnalysis\RouteAnalysisSchema;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Segment\SegmentStore;
 use Runalyze\Bundle\CoreBundle\Entity\Account;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
@@ -28,6 +29,8 @@ class RouteAnalysisController extends Controller
      */
     private function climbStore()
     {
+        RouteAnalysisSchema::ensureTables($this->getDoctrine()->getConnection(), $this->getParameter('database_prefix'));
+
         return new ClimbStore($this->getDoctrine()->getConnection(), $this->getParameter('database_prefix'));
     }
 
@@ -36,6 +39,8 @@ class RouteAnalysisController extends Controller
      */
     private function segmentStore()
     {
+        RouteAnalysisSchema::ensureTables($this->getDoctrine()->getConnection(), $this->getParameter('database_prefix'));
+
         return new SegmentStore($this->getDoctrine()->getConnection(), $this->getParameter('database_prefix'));
     }
 
@@ -320,6 +325,7 @@ class RouteAnalysisController extends Controller
      */
     private function sportsWithClimbs(Account $account)
     {
+        RouteAnalysisSchema::ensureTables($this->getDoctrine()->getConnection(), $this->getParameter('database_prefix'));
         $prefix = $this->getParameter('database_prefix');
 
         return $this->getDoctrine()->getConnection()->fetchAll(
