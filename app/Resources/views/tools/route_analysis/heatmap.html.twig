@@ -3,6 +3,30 @@
 {% block content %}
     {% include 'tools/route_analysis/_shared.html.twig' %}
 
+    <style>
+        .ra-heat-wrap { display:flex; gap:10px; align-items:stretch; }
+        .ra-heat-wrap .ra-map { flex:1; min-width:0; margin:0; }
+        #ra-heat-side { width:340px; height:480px; overflow:auto; border:1px solid #ccc; background:#fff; }
+        #ra-heat-side .head { padding:6px 8px; border-bottom:1px solid #ccc; background:#f4f4f4; position:sticky; top:0; }
+        #ra-heat-side .head .ra-chips { margin:4px 0 0; }
+        #ra-heat-side .row { display:flex; gap:6px; align-items:center; padding:5px 8px; border-bottom:1px solid #eee; cursor:pointer; }
+        #ra-heat-side .row:hover { background:#f0f4ff; }
+        #ra-heat-side .row.selected { background:#fff4c2; }
+        #ra-heat-side .row .txt { flex:1; min-width:0; }
+        #ra-heat-side .row .txt small { color:#666; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        #ra-heat-side .row .open { padding:2px 6px; border:1px solid #999; border-radius:3px; background:#fff; }
+        #ra-heat-side .empty { padding:10px; color:#666; }
+        @media (max-width: 900px) { .ra-heat-wrap { flex-direction:column; } #ra-heat-side { width:auto; height:auto; max-height:360px; } }
+    </style>
+
+    <div class="panel-menu">
+        <ul>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-climbs') }}">Anstiege</a></li>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-segments') }}">Segmente</a></li>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-route-colors') }}"><i class="fa fa-paint-brush"></i> Farben</a></li>
+        </ul>
+    </div>
+
     <div class="panel-heading">
         <h1>Heatmap</h1>
     </div>
@@ -16,19 +40,20 @@
                 <label>Von <select id="ra-heat-from"></select></label>
                 <label>bis <select id="ra-heat-to"></select></label>
                 <label>Deckkraft <input type="range" id="ra-heat-alpha" min="5" max="80" value="35" style="vertical-align:middle"></label>
-                <span id="ra-heat-info" style="color:#777"></span>
+                <span id="ra-heat-info" style="color:#555"></span>
             </div>
         </div>
 
-        <div id="ra-heat-map" class="ra-map"></div>
-        <p class="info small">Klick auf die Karte zeigt die Aktivitäten, die dort vorbeikamen. Mausrad zoomt.</p>
-        <div id="ra-heat-hits"></div>
+        <div class="ra-heat-wrap">
+            <div id="ra-heat-map" class="ra-map"></div>
+            <div id="ra-heat-side"><div class="empty">Auf eine Strecke in der Karte klicken: Hier erscheinen dann alle Aktivitäten, die dort vorbeikamen.</div></div>
+        </div>
     </div>
 
     <script>
     (function($){
-        var COLORS = RouteTools.sportColors;
-        var data = null, sportColor = {}, sportOn = {}, map = null, layer = null;
+        var data = null, sportColor = {}, sportOn = {}, sportName = {}, map = null, layer = null;
+        var hits = [], selected = {}, onlyHits = false, clickMarker = null, highlight = null, hoverLine = null;
 
         var HeatLayer = L.Class.extend({
             initialize: function(draw) { this._draw = draw; },
@@ -55,6 +80,8 @@
             }
         });
 
+        function esc(text) { return $('<div>').text(text || '').html(); }
+
         function decodeActivities() {
             var len = data.precision;
             data.activities.forEach(function(a) {
@@ -76,7 +103,11 @@
 
         function visible() {
             var from = +$('#ra-heat-from').val(), to = +$('#ra-heat-to').val();
-            return data.activities.filter(function(a) { return sportOn[a.s] && a.year >= from && a.year <= to; });
+            var ids = {};
+            if (onlyHits) hits.forEach(function(a) { ids[a.id] = true; });
+            return data.activities.filter(function(a) {
+                return onlyHits ? ids[a.id] : (sportOn[a.s] && a.year >= from && a.year <= to);
+            });
         }
 
         function projected(a, zoom) {
@@ -118,16 +149,109 @@
                 }
                 ctx.stroke();
             });
-            $('#ra-heat-info').text(acts.length + ' Aktivitäten · ' + Math.round(km).toLocaleString('de-DE') + ' km');
+            $('#ra-heat-info').text(acts.length + ' Aktivitäten · ' + Math.round(km).toLocaleString('de-DE') + ' km' + (onlyHits ? ' (nur Treffer)' : ''));
+        }
+
+        function lines(a) {
+            var parts = [], cur = [];
+            for (var i = 0; i < a.lat.length; i++) {
+                if (isNaN(a.lat[i])) { if (cur.length > 1) parts.push(cur); cur = []; continue; }
+                cur.push([a.lat[i], a.lng[i]]);
+            }
+            if (cur.length > 1) parts.push(cur);
+            return parts;
+        }
+
+        function drawHighlight() {
+            if (highlight) map.removeLayer(highlight);
+            highlight = L.featureGroup();
+            hits.forEach(function(a) {
+                if (!selected[a.id]) return;
+                lines(a).forEach(function(part) {
+                    L.polyline(part, { color: '#000', weight: 8, opacity: 1 }).addTo(highlight);
+                    L.polyline(part, { color: RouteTools.color.selection, weight: 5, opacity: 1 }).addTo(highlight);
+                });
+            });
+            highlight.addTo(map);
+            if (clickMarker) clickMarker.bringToFront();
+        }
+
+        function hover(a) {
+            if (hoverLine) { map.removeLayer(hoverLine); hoverLine = null; }
+            if (!a) return;
+            hoverLine = L.featureGroup();
+            lines(a).forEach(function(part) { L.polyline(part, { color: RouteTools.color.line, weight: 4, opacity: 1, dashArray: '6,4' }).addTo(hoverLine); });
+            hoverLine.addTo(map);
+        }
+
+        function renderSide() {
+            var $side = $('#ra-heat-side').empty();
+            if (!hits.length) {
+                $side.html('<div class="empty">Keine Aktivität an dieser Stelle. Näher heranzoomen oder genauer auf eine Linie klicken.</div>');
+                return;
+            }
+            var nSel = hits.filter(function(a) { return selected[a.id]; }).length;
+            var $head = $('<div class="head"></div>').appendTo($side);
+            $head.append('<strong>' + hits.length + ' Aktivitäten an dieser Stelle</strong>' + (nSel ? ' · ' + nSel + ' ausgewählt' : ''));
+            var $btns = $('<div class="ra-chips"></div>').appendTo($head);
+            $('<span class="ra-chip"></span>').text(onlyHits ? 'Wieder alle zeigen' : 'Nur diese in der Karte').on('click', function() {
+                onlyHits = !onlyHits; layer.redraw(); renderSide();
+            }).appendTo($btns);
+            $('<span class="ra-chip">Alle auswählen</span>').on('click', function() {
+                hits.forEach(function(a) { selected[a.id] = true; }); drawHighlight(); renderSide();
+            }).appendTo($btns);
+            if (nSel) {
+                $('<span class="ra-chip">Auswahl aufheben</span>').on('click', function() { selected = {}; drawHighlight(); renderSide(); }).appendTo($btns);
+                $('<span class="ra-chip">Auf Auswahl zoomen</span>').on('click', function() { if (highlight && highlight.getLayers().length) map.fitBounds(highlight.getBounds(), { padding: [20, 20] }); }).appendTo($btns);
+            }
+            hits.forEach(function(a) {
+                var d = new Date(a.t * 1000);
+                var $row = $('<div class="row"></div>').toggleClass('selected', !!selected[a.id]).appendTo($side);
+                $('<input type="checkbox">').prop('checked', !!selected[a.id]).appendTo($row);
+                $('<i class="dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;border:1px solid #000"></i>').css('background', sportColor[a.s]).appendTo($row);
+                $('<div class="txt"></div>').html(
+                    '<strong>' + d.toLocaleDateString('de-DE') + '</strong> · ' + esc(sportName[a.s]) + ' · ' + a.d.toFixed(1).replace('.', ',') + ' km' +
+                    '<small>' + (esc(a.n) || '&nbsp;') + '</small>'
+                ).appendTo($row);
+                $('<span class="open" title="Aktivität öffnen"><i class="fa fa-external-link"></i></span>').on('click', function(e) {
+                    e.stopPropagation(); RouteTools.openActivity(a.id);
+                }).appendTo($row);
+                $row.on('click', function() {
+                    if (selected[a.id]) delete selected[a.id]; else selected[a.id] = true;
+                    drawHighlight(); renderSide();
+                }).on('mouseenter', function() { hover(a); }).on('mouseleave', function() { hover(null); });
+            });
+        }
+
+        function findHits(e) {
+            var zoom = map.getZoom(), off = offset(), cp = map.latLngToContainerPoint(e.latlng), found = [];
+            var tol = 8, ll = e.latlng, dLat = 0.02, dLng = 0.03;
+            var from = +$('#ra-heat-from').val(), to = +$('#ra-heat-to').val();
+            data.activities.forEach(function(a) {
+                if (!sportOn[a.s] || a.year < from || a.year > to) return;
+                var b = a.box;
+                if (ll.lat < b[0] - dLat || ll.lat > b[2] + dLat || ll.lng < b[1] - dLng || ll.lng > b[3] + dLng) return;
+                var xy = projected(a, zoom);
+                for (var i = 0; i < xy.length; i += 2) {
+                    var dx = xy[i] + off[0] - cp.x, dy = xy[i + 1] + off[1] - cp.y;
+                    if (dx * dx + dy * dy <= tol * tol) { found.push(a); break; }
+                }
+            });
+            found.sort(function(a, b) { return b.t - a.t; });
+            hits = found; selected = {};
+            if (onlyHits) { onlyHits = false; layer.redraw(); }
+            if (clickMarker) map.removeLayer(clickMarker);
+            clickMarker = L.circleMarker(e.latlng, { radius: 8, color: '#000', weight: 2, fillColor: RouteTools.color.selection, fillOpacity: 1 }).addTo(map);
+            drawHighlight();
+            renderSide();
         }
 
         function initialBounds() {
             var acts = visible();
             if (!acts.length) return null;
-            var starts = acts.map(function(a) { return [a.box[0], a.box[1]]; });
-            var mLat = starts.map(function(s) { return s[0]; }).sort(function(a, b) { return a - b; })[Math.floor(starts.length / 2)];
-            var mLng = starts.map(function(s) { return s[1]; }).sort(function(a, b) { return a - b; })[Math.floor(starts.length / 2)];
-            var bounds = null;
+            var lats = acts.map(function(a) { return a.box[0]; }).sort(function(a, b) { return a - b; });
+            var lngs = acts.map(function(a) { return a.box[1]; }).sort(function(a, b) { return a - b; });
+            var mLat = lats[Math.floor(lats.length / 2)], mLng = lngs[Math.floor(lngs.length / 2)], bounds = null;
             acts.forEach(function(a) {
                 if (Math.abs(a.box[0] - mLat) > 0.5 || Math.abs(a.box[1] - mLng) > 0.7) return;
                 var bb = L.latLngBounds([a.box[0], a.box[1]], [a.box[2], a.box[3]]);
@@ -136,37 +260,14 @@
             return bounds;
         }
 
-        function showHits(e) {
-            var zoom = map.getZoom(), off = offset(), cp = map.latLngToContainerPoint(e.latlng), hits = [];
-            var tol = 8, ll = e.latlng, dLat = 0.02, dLng = 0.03;
-            visible().forEach(function(a) {
-                var b = a.box;
-                if (ll.lat < b[0] - dLat || ll.lat > b[2] + dLat || ll.lng < b[1] - dLng || ll.lng > b[3] + dLng) return;
-                var xy = projected(a, zoom);
-                for (var i = 0; i < xy.length; i += 2) {
-                    var dx = xy[i] + off[0] - cp.x, dy = xy[i + 1] + off[1] - cp.y;
-                    if (dx * dx + dy * dy <= tol * tol) { hits.push(a); break; }
-                }
-            });
-            hits.sort(function(a, b) { return b.t - a.t; });
-            var names = {};
-            data.sports.forEach(function(s) { names[s.id] = s.name; });
-            var html = '<table class="fullwidth zebra-style ra-table"><thead><tr><th colspan="4">' + hits.length + ' Aktivitäten an dieser Stelle</th></tr></thead><tbody>';
-            hits.slice(0, 100).forEach(function(a) {
-                var d = new Date(a.t * 1000);
-                html += '<tr class="link" onclick="RouteTools.openActivity(' + a.id + ')"><td>' + d.toLocaleDateString('de-DE') + '</td><td><i class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + sportColor[a.s] + '"></i> ' + (names[a.s] || '') + '</td><td>' + $('<div>').text(a.n || '').html() + '</td><td class="r">' + a.d.toFixed(1).replace('.', ',') + ' km</td></tr>';
-            });
-            if (!hits.length) html += '<tr><td colspan="4"><em>Keine Aktivität innerhalb von ' + tol + ' Pixeln.</em></td></tr>';
-            $('#ra-heat-hits').html(html + '</tbody></table>');
-        }
-
         function buildControls() {
             var $sports = $('#ra-heat-sports');
             data.sports.forEach(function(s, i) {
-                sportColor[s.id] = COLORS[i % COLORS.length];
+                sportColor[s.id] = RouteTools.sportColor(s.id, i);
+                sportName[s.id] = s.name;
                 sportOn[s.id] = i < 3;
                 $('<span class="ra-chip"></span>').toggleClass('off', !sportOn[s.id])
-                    .html('<i class="dot" style="background:' + sportColor[s.id] + '"></i>' + $('<div>').text(s.name).html() + ' <small>(' + s.count + ')</small>')
+                    .html('<i class="dot" style="background:' + sportColor[s.id] + ';border:1px solid #000"></i>' + esc(s.name) + ' <small>(' + s.count + ')</small>')
                     .on('click', function() { sportOn[s.id] = !sportOn[s.id]; $(this).toggleClass('off', !sportOn[s.id]); layer.redraw(); })
                     .appendTo($sports);
             });
@@ -198,7 +299,7 @@
             if (b) map.fitBounds(b);
             layer = new HeatLayer(draw);
             map.addLayer(layer);
-            map.on('click', showHits);
+            map.on('click', findHits);
         }).fail(function(xhr) {
             $('#ra-heat-status').html('<p class="error">Die Routen konnten nicht geladen werden (' + xhr.status + ' ' + xhr.statusText + ').</p>');
         });

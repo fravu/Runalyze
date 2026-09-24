@@ -6,6 +6,7 @@ use Runalyze\Bundle\CoreBundle\Component\Tool\Climb\ClimbStore;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Geo\GeoUtil;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Heatmap\HeatmapData;
 use Runalyze\Bundle\CoreBundle\Component\Tool\RouteAnalysis\RouteAnalysisSchema;
+use Runalyze\Bundle\CoreBundle\Component\Tool\RouteAnalysis\RouteColors;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Segment\SegmentStore;
 use Runalyze\Bundle\CoreBundle\Entity\Account;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
@@ -42,6 +43,63 @@ class RouteAnalysisController extends Controller
         RouteAnalysisSchema::ensureTables($this->getDoctrine()->getConnection(), $this->getParameter('database_prefix'));
 
         return new SegmentStore($this->getDoctrine()->getConnection(), $this->getParameter('database_prefix'));
+    }
+
+    /**
+     * @return RouteColors
+     */
+    private function routeColors()
+    {
+        return new RouteColors($this->getDoctrine()->getRepository('CoreBundle:Conf'));
+    }
+
+    /**
+     * All pages of this tool get the user's colors
+     */
+    protected function render($view, array $parameters = [], Response $response = null)
+    {
+        if (!isset($parameters['colors']) && $this->getUser() instanceof Account) {
+            $parameters['colors'] = $this->routeColors()->load($this->getUser());
+        }
+
+        return parent::render($view, $parameters, $response);
+    }
+
+    /**
+     * @Route("/my/tools/route-colors", name="tools-route-colors")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function colorsAction(Account $account)
+    {
+        $prefix = $this->getParameter('database_prefix');
+        $sports = $this->getDoctrine()->getConnection()->fetchAll(
+            'SELECT s.`id`, s.`name`, COUNT(t.`id`) AS `num`
+             FROM `'.$prefix.'sport` s
+             LEFT JOIN `'.$prefix.'training` t ON t.`sportid` = s.`id` AND t.`routeid` IS NOT NULL
+             WHERE s.`accountid` = ? GROUP BY s.`id` ORDER BY `num` DESC, s.`name`',
+            [$account->getId()]
+        );
+
+        return $this->render('tools/route_analysis/colors.html.twig', [
+            'definitions' => RouteColors::BASE,
+            'sports' => $sports,
+        ]);
+    }
+
+    /**
+     * @Route("/my/tools/route-colors/save", name="tools-route-colors-save")
+     * @Method("POST")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function colorsSaveAction(Request $request, Account $account)
+    {
+        if ($request->request->get('reset')) {
+            $this->routeColors()->reset($account);
+        } else {
+            $this->routeColors()->save($account, (array)$request->request->get('base', []), (array)$request->request->get('sports', []));
+        }
+
+        return new JsonResponse(['ok' => true]);
     }
 
     /**

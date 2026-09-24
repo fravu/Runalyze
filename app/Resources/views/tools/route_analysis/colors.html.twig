@@ -1,0 +1,98 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/route_analysis/_shared.html.twig' %}
+
+    <div class="panel-menu">
+        <ul>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-heatmap') }}">Heatmap</a></li>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-climbs') }}">Anstiege</a></li>
+            <li><a class="ajax" target="ajax" href="{{ url('tools-segments') }}">Segmente</a></li>
+        </ul>
+    </div>
+
+    <div class="panel-heading">
+        <h1>Farben für Heatmap, Anstiege und Segmente</h1>
+    </div>
+
+    <div class="panel-content">
+        <form id="ra-colors" onsubmit="return false;">
+            {% set group = '' %}
+            {% for key, def in definitions %}
+                {% if def[2] != group %}
+                    {% if group != '' %}</div>{% endif %}
+                    {% set group = def[2] %}
+                    <h3 style="margin-top:12px">{{ group }}</h3>
+                    <div class="ra-chips">
+                {% endif %}
+                <label class="ra-chip" style="cursor:default">
+                    <input type="color" name="base[{{ key }}]" value="{{ colors.base[key] }}" data-key="{{ key }}" style="vertical-align:middle;width:36px;height:24px;border:0;padding:0;background:none">
+                    {{ def[1] }}
+                </label>
+            {% endfor %}
+            {% if group != '' %}</div>{% endif %}
+
+            <h3 style="margin-top:12px">Sportarten in der Heatmap</h3>
+            <div class="ra-chips">
+                {% for sport in sports %}
+                    <label class="ra-chip" style="cursor:default">
+                        <input type="color" name="sports[{{ sport.id }}]" value="{{ colors.sports[sport.id] is defined ? colors.sports[sport.id] : colors.palette[loop.index0 % colors.palette|length] }}" style="vertical-align:middle;width:36px;height:24px;border:0;padding:0;background:none">
+                        {{ sport.name }} <small>({{ sport.num }})</small>
+                    </label>
+                {% endfor %}
+            </div>
+
+            <h3 style="margin-top:16px">Vorschau</h3>
+            <div id="ra-colors-preview-cats" class="ra-chips"></div>
+            <svg id="ra-colors-preview" class="ra-profile"></svg>
+            <div id="ra-colors-legend" class="ra-legend"></div>
+
+            <p class="c" style="margin-top:12px">
+                <input type="button" id="ra-colors-save" value="Speichern">
+                <input type="button" id="ra-colors-reset" value="Standardfarben wiederherstellen">
+                <span id="ra-colors-msg" style="margin-left:10px"></span>
+            </p>
+        </form>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+
+        // synthetic profile covering all grade classes
+        var pts = [], km = 0, e = 400, grades = [2, 2, -4, -3, 3, 4, 7, 8, 12, 13, 18, 20, 9, 4, -6];
+        grades.forEach(function(g) { for (var k = 0; k < 10; k++) { pts.push([pts.length, km, e, null, null, null]); km += 0.05; e += g * 0.5; } });
+
+        function textColor(hex) {
+            var c = [1, 3, 5].map(function(i) { var v = parseInt(hex.substr(i, 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+            return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 0.179 ? '#000' : '#fff';
+        }
+
+        function preview() {
+            $('#ra-colors input[data-key]').each(function() { RouteTools.colors.base[$(this).data('key')] = $(this).val(); });
+            var cats = '';
+            ['5', '4', '3', '2', '1', 'HC'].forEach(function(cat) {
+                var bg = RouteTools.colors.base['cat_' + cat];
+                cats += '<span class="ra-cat" style="background:' + bg + ';color:' + textColor(bg) + ';border:1px solid #666">' + cat + '</span> ';
+            });
+            $('#ra-colors-preview-cats').html(cats);
+            RouteTools.drawProfile(document.getElementById('ra-colors-preview'), pts, { relative: true });
+            $('#ra-colors-legend').html(RouteTools.legend());
+        }
+
+        $('#ra-colors input[type=color]').on('input change', preview);
+        preview();
+
+        var save = function(data) {
+            $('#ra-colors-msg').text('Speichere …');
+            $.post('{{ url('tools-route-colors-save') }}', data).done(function() {
+                $('#ajax').loadDiv('{{ url('tools-route-colors') }}');
+            }).fail(function(xhr) {
+                $('#ra-colors-msg').text('Fehler: ' + xhr.status + ' ' + xhr.statusText);
+            });
+        };
+        $('#ra-colors-save').on('click', function() { save($('#ra-colors').serialize()); });
+        $('#ra-colors-reset').on('click', function() { save({ reset: 1 }); });
+    })(jQuery);
+    </script>
+{% endblock %}

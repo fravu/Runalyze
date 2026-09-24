@@ -1,8 +1,9 @@
 <style>
     .ra-cat { display:inline-block; min-width:2.2em; text-align:center; border-radius:3px; color:#fff; font-weight:bold; font-size:11px; padding:1px 5px; }
-    /* colorblind friendly: yellow -> blue -> black, no red/green */
-    .ra-cat-HC { background:#000; } .ra-cat-1 { background:#0b1f66; } .ra-cat-2 { background:#1f5fd1; }
-    .ra-cat-3 { background:#8cc8ff; color:#000; } .ra-cat-4 { background:#ffd000; color:#000; } .ra-cat-5 { background:#fff3a8; color:#000; border:1px solid #c9b200; }
+    /* user colors (Tools > Farben), defaults are colorblind friendly */
+    {% for cat in ['HC', '1', '2', '3', '4', '5'] %}
+    .ra-cat-{{ cat }} { background:{{ colors.base['cat_' ~ cat] }}; color:{{ colors.text['cat_' ~ cat] }}; border:1px solid {{ colors.text['cat_' ~ cat] == '#000000' ? '#666' : colors.base['cat_' ~ cat] }}; }
+    {% endfor %}
     .ra-map { height:480px; margin:5px 0; }
     .ra-map-small { height:320px; margin:5px 0; }
     .ra-profile { width:100%; height:200px; display:block; cursor:crosshair; }
@@ -61,12 +62,18 @@ window.RouteTools = (function($){
     };
 
     self.gradeColor = function(g) {
-        return g < 0 ? '#d9d9d9' : g < 5 ? '#ffe14d' : g < 10 ? '#8cc8ff' : g < 15 ? '#1f5fd1' : '#0b1f66';
+        var c = self.colors.base;
+        return g < 0 ? c.grade_down : g < 5 ? c.grade_1 : g < 10 ? c.grade_2 : g < 15 ? c.grade_3 : c.grade_4;
     };
 
-    // colorblind friendly, high contrast (no red/green)
-    self.color = { line: '#0047b3', selection: '#ffb000', start: '#ffd000', end: '#0b1f66' };
-    self.sportColors = ['#0047b3', '#d4a200', '#000000', '#00a0e0', '#8a2be2', '#ff8c00', '#e600c8', '#7f7f7f'];
+    self.colors = {{ colors|json_encode|raw }};
+    self.color = { line: self.colors.base.line, selection: self.colors.base.selection, start: self.colors.base.start, end: self.colors.base.end };
+    self.sportColors = self.colors.palette;
+
+    // sport color in the heatmap: user choice, else palette by rank
+    self.sportColor = function(sportId, rank) {
+        return self.colors.sports[sportId] || self.colors.palette[rank % self.colors.palette.length];
+    };
 
     self.startMarker = function(latlng) {
         return L.circleMarker(latlng, { radius: 7, color: '#000', weight: 2, fillColor: self.color.start, fillOpacity: 1 }).bindPopup('Start');
@@ -77,8 +84,8 @@ window.RouteTools = (function($){
     };
 
     self.legend = function() {
-        return '<span><i style="background:#ffe14d;border:1px solid #999"></i>&lt; 5 %</span><span><i style="background:#8cc8ff"></i>5–10 %</span>' +
-            '<span><i style="background:#1f5fd1"></i>10–15 %</span><span><i style="background:#0b1f66"></i>&gt; 15 %</span><span><i style="background:#d9d9d9"></i>bergab</span>';
+        var c = self.colors.base, item = function(color, label) { return '<span><i style="background:' + color + ';border:1px solid #666"></i>' + label + '</span>'; };
+        return item(c.grade_1, '&lt; 5 %') + item(c.grade_2, '5–10 %') + item(c.grade_3, '10–15 %') + item(c.grade_4, '&gt; 15 %') + item(c.grade_down, 'bergab');
     };
 
     /**
@@ -124,7 +131,7 @@ window.RouteTools = (function($){
             runStart = i;
         }
         s += '<polyline fill="none" stroke="#333" stroke-width="1.2" points="' + withElev.map(function(p){ return X(p[1]) + ',' + Y(p[2]); }).join(' ') + '"/>';
-        s += '<rect class="ra-sel" x="0" y="' + T + '" width="0" height="' + (H - T - B) + '" fill="rgba(255,176,0,.25)" stroke="#b37a00" style="display:none"/>';
+        s += '<rect class="ra-sel" x="0" y="' + T + '" width="0" height="' + (H - T - B) + '" fill="' + self.colors.base.selection + '" fill-opacity=".3" stroke="#000" style="display:none"/>';
         s += '<line class="ra-hover" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" stroke="#000" stroke-dasharray="3,3" style="display:none"/>';
         svg.innerHTML = s;
 
