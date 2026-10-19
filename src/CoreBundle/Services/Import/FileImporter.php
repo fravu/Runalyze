@@ -205,6 +205,12 @@ class FileImporter implements LoggerAwareInterface
             );
         } catch (ParserException $e) {
             return new FileImportResult([], $fileName, $originalFileName, $e);
+        } catch (\Throwable $e) {
+            // An unexpected error in one file (e.g. unusual FIT data) must not
+            // break the import of all other files of the same upload.
+            return new FileImportResult([], $fileName, $originalFileName, new ParserException(
+                'Datei konnte nicht gelesen werden: '.$e->getMessage(), 0, $e instanceof \Exception ? $e : null
+            ));
         }
     }
 

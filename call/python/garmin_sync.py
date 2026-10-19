@@ -17,14 +17,13 @@ Usage:
         stores the resulting session tokens in <session_dir> for reuse by
         later "sync" calls (no password is stored on disk).
 
-    garmin_sync.py sync <session_dir> <since_epoch> <target_dir> <max_activities>
-        Resumes the saved session, fetches activities started after
-        <since_epoch> (unix timestamp, UTC), downloads at most
-        <max_activities> of them (newest first) as .fit files into
-        <target_dir>, and prints a JSON summary to stdout. If there are
-        more matching activities left after the cap, "more_available" is
-        true in the result and the same since_epoch boundary can simply be
-        used again to continue.
+    garmin_sync.py sync <session_dir> <since_epoch> <target_dir> <max_activities> [max_seconds]
+        Resumes the saved session, lists all activities started after
+        <since_epoch> (unix timestamp, UTC) and downloads them OLDEST first
+        (.fit, or .tcx/.gpx for older uploads) into <target_dir>, stopping
+        after <max_activities> or <max_seconds> (default 45). "resume_epoch"
+        in the result is the start time of the newest processed activity -
+        use it as since_epoch for the next call to continue seamlessly.
 
 All output is a single JSON object on stdout:
     {"status": "ok", ...}
@@ -35,6 +34,7 @@ import datetime
 import io
 import json
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -89,28 +89,71 @@ def parse_start_time(activity):
     return None
 
 
-def extract_fit_from_zip(zip_bytes):
+IMPORTABLE_EXTENSIONS = ('.fit', '.tcx', '.gpx')
+
+
+def extract_activity_file(zip_bytes):
+    """Return (extension, bytes) of the activity file inside Garmin's 'original' zip.
+
+    Newer devices upload .fit, older uploads (or imports from other platforms)
+    can be .tcx or .gpx - Runalyze imports all of them.
+    """
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
-        fit_names = [n for n in z.namelist() if n.lower().endswith('.fit')]
-        if not fit_names:
-            raise ValueError("downloaded archive did not contain a .fit file")
-        return z.read(fit_names[0])
+        for ext in IMPORTABLE_EXTENSIONS:
+            names = [n for n in z.namelist() if n.lower().endswith(ext)]
+            if names:
+                return ext, z.read(names[0])
+    raise ValueError("archive contains no .fit/.tcx/.gpx file (manually entered activity?)")
 
 
-def cmd_sync(session_dir, since_epoch, target_dir, max_activities):
+def list_activities_since(client, since_epoch):
+    """All activities started after since_epoch, oldest first (only metadata, cheap)."""
+    result = []
+    start = 0
+    batch_size = 100
+
+    while True:
+        activities = client.get_activities(start=start, limit=batch_size)
+
+        if not activities:
+            break
+
+        reached_boundary = False
+
+        for activity in activities:
+            activity_id = activity.get("activityId")
+            activity_epoch = parse_start_time(activity)
+
+            if activity_id is None or activity_epoch is None:
+                continue
+
+            if activity_epoch <= since_epoch:
+                reached_boundary = True
+                break
+
+            result.append((activity_epoch, activity_id))
+
+        if reached_boundary or len(activities) < batch_size:
+            break
+
+        start += batch_size
+
+    result.sort()
+    return result
+
+
+def cmd_sync(session_dir, since_epoch, target_dir, max_activities, max_seconds="45"):
     Garmin = import_garmin()
 
     try:
         since_epoch = int(since_epoch)
+        max_activities = int(max_activities)
+        max_seconds = float(max_seconds)
     except ValueError:
-        fail("since_epoch must be an integer unix timestamp.")
+        fail("since_epoch, max_activities and max_seconds must be numbers.")
         return
 
-    try:
-        max_activities = int(max_activities)
-    except ValueError:
-        fail("max_activities must be an integer.")
-        return
+    started = time.monotonic()
 
     try:
         client = Garmin()
@@ -122,79 +165,62 @@ def cmd_sync(session_dir, since_epoch, target_dir, max_activities):
     target = Path(target_dir)
     target.mkdir(parents=True, exist_ok=True)
 
-    downloaded = []
-    errors = []
-    # The oldest activity's timestamp among everything we looked at in this
-    # run - NOT the newest. Activities come back newest-first, so this is
-    # exactly the boundary the next run needs to resume from without either
-    # re-downloading everything again or silently skipping a gap of
-    # activities that were never reached because of the max_activities cap.
-    oldest_processed_epoch = None
-    more_available = False
-    processed_count = 0
-
-    start = 0
-    batch_size = 20
-
     try:
-        while True:
-            activities = client.get_activities(start=start, limit=batch_size)
-
-            if not activities:
-                break
-
-            stop = False
-
-            for activity in activities:
-                activity_id = activity.get("activityId")
-                activity_epoch = parse_start_time(activity)
-
-                if activity_id is None or activity_epoch is None:
-                    continue
-
-                if activity_epoch <= since_epoch:
-                    stop = True
-                    break
-
-                if processed_count >= max_activities:
-                    more_available = True
-                    stop = True
-                    break
-
-                try:
-                    zip_bytes = client.download_activity(
-                        activity_id,
-                        dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL,
-                    )
-                    fit_bytes = extract_fit_from_zip(zip_bytes)
-                    fit_path = target / f"{activity_id}.fit"
-                    fit_path.write_bytes(fit_bytes)
-                    downloaded.append(fit_path.name)
-                except Exception as e:
-                    errors.append(f"activity {activity_id}: {e}")
-
-                processed_count += 1
-                oldest_processed_epoch = (
-                    activity_epoch if oldest_processed_epoch is None
-                    else min(oldest_processed_epoch, activity_epoch)
-                )
-
-            if stop or len(activities) < batch_size:
-                break
-
-            start += batch_size
+        pending = list_activities_since(client, since_epoch)
     except Exception as e:
         fail(f"Fetching activity list failed: {e}")
         return
+
+    downloaded = []
+    errors = []
+    # Activities are processed OLDEST first, so the newest processed start time
+    # is exactly where the next run continues - nothing is skipped and nothing
+    # is downloaded twice, however many clicks it takes.
+    newest_processed_epoch = None
+    aborted = None
+
+    for activity_epoch, activity_id in pending:
+        if len(downloaded) + len(errors) >= max_activities or time.monotonic() - started > max_seconds:
+            break
+
+        label = f"{datetime.datetime.fromtimestamp(activity_epoch, datetime.timezone.utc):%d.%m.%Y} (Garmin-ID {activity_id})"
+
+        try:
+            zip_bytes = client.download_activity(
+                activity_id,
+                dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL,
+            )
+            ext, data = extract_activity_file(zip_bytes)
+            path = target / f"{activity_id}{ext}"
+            path.write_bytes(data)
+            downloaded.append(path.name)
+        except (ValueError, zipfile.BadZipFile) as e:
+            # permanent: there simply is no importable file for this activity
+            errors.append(f"{label}: {e}")
+        except Exception as e:
+            if "404" in str(e):
+                errors.append(f"{label}: no file on Garmin Connect (404)")
+            else:
+                # temporary (rate limit, network, ...): stop here WITHOUT skipping
+                # this activity, the next click continues exactly at it
+                aborted = f"{label}: {e}"
+                break
+
+        newest_processed_epoch = activity_epoch
+
+    processed = len(downloaded) + len(errors)
 
     print(json.dumps({
         "status": "ok",
         "downloaded": downloaded,
         "errors": errors,
-        "more_available": more_available,
+        "total": len(pending),
+        "remaining": len(pending) - processed,
+        "more_available": processed < len(pending),
+        "aborted": aborted,
         # Only meaningful when something was actually processed; the caller
-        # should keep using the previous since_epoch otherwise.
-        "resume_epoch": oldest_processed_epoch,
+        # keeps the previous since_epoch otherwise.
+        "resume_epoch": newest_processed_epoch,
     }))
 
 
@@ -210,9 +236,9 @@ def main():
         cmd_login(session_dir)
     elif mode == "sync":
         if len(sys.argv) < 6:
-            fail("Usage: garmin_sync.py sync <session_dir> <since_epoch> <target_dir> <max_activities>")
+            fail("Usage: garmin_sync.py sync <session_dir> <since_epoch> <target_dir> <max_activities> [max_seconds]")
             return
-        cmd_sync(session_dir, sys.argv[3], sys.argv[4], sys.argv[5])
+        cmd_sync(session_dir, sys.argv[3], sys.argv[4], sys.argv[5], *sys.argv[6:7])
     else:
         fail(f"Unknown mode '{mode}'.")
 

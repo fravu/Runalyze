@@ -30,7 +30,11 @@ class GarminSyncController extends Controller
     // rate-limiting and the process timeout below both make "just download
     // everything since the beginning of time" a bad idea for accounts with
     // a large history - the user clicks "sync now" repeatedly instead.
-    const MAX_ACTIVITIES_PER_RUN = 100;
+    const MAX_ACTIVITIES_PER_RUN = 25;
+
+    // Each click must finish well within typical web server timeouts (60 s),
+    // the picker afterwards has to parse every downloaded file as well.
+    const MAX_SECONDS_PER_RUN = 40;
 
     /**
      * @return string
@@ -164,7 +168,7 @@ class GarminSyncController extends Controller
     }
 
     /**
-     * Moves any downloaded .fit files from the temporary per-account Garmin
+     * Moves any downloaded .fit/.tcx/.gpx files from the temporary per-account Garmin
      * download folder into the shared data/import/ folder that the normal
      * browser upload also uses, so the same file-picker/preview page
      * (activity-upload) can be used instead of forcing an all-or-nothing
@@ -177,7 +181,12 @@ class GarminSyncController extends Controller
      */
     private function moveIntoImportQueue($garminDownloadDir)
     {
-        $fitFiles = glob($garminDownloadDir.'/*.fit');
+        $fitFiles = array_merge(
+            glob($garminDownloadDir.'/*.fit') ?: [],
+            glob($garminDownloadDir.'/*.tcx') ?: [],
+            glob($garminDownloadDir.'/*.gpx') ?: []
+        );
+        sort($fitFiles, SORT_NATURAL);
 
         if (empty($fitFiles)) {
             return [];
@@ -214,6 +223,8 @@ class GarminSyncController extends Controller
      */
     public function runAction(Account $account)
     {
+        @set_time_limit(120);
+
         $trans = $this->get('translator');
 
         if (!$this->isConnected($account)) {
@@ -242,6 +253,7 @@ class GarminSyncController extends Controller
                 (string)$since,
                 $downloadDir,
                 (string)self::MAX_ACTIVITIES_PER_RUN,
+                (string)self::MAX_SECONDS_PER_RUN,
             ]);
             $process->setTimeout(300);
             $result = $this->runProcess($process);
@@ -265,18 +277,23 @@ class GarminSyncController extends Controller
             $messages = [];
 
             if (!empty($result['errors'])) {
-                $messages[] = $trans->trans('%count% activities could not be downloaded, see server log for details.', [
-                    '%count%' => count($result['errors']),
-                ]);
+                $this->get('logger')->warning('Garmin sync: activities skipped', ['errors' => $result['errors']]);
+                $messages[] = count($result['errors']).' Aktivität(en) ohne importierbare Datei übersprungen: '.implode('; ', array_slice($result['errors'], 0, 5)).(count($result['errors']) > 5 ? ' …' : '');
+            }
+
+            if (!empty($result['aborted'])) {
+                $messages[] = 'Download unterbrochen (Garmin hat vorübergehend abgelehnt: '.$result['aborted'].'). Beim nächsten Klick geht es an derselben Stelle weiter, ggf. ein paar Minuten warten.';
             }
 
             if (!empty($result['more_available'])) {
-                $messages[] = $trans->trans('There are more activities left to sync (capped at %max% per click) - click "Sync now" again once you are done here to continue.', [
-                    '%max%' => self::MAX_ACTIVITIES_PER_RUN,
-                ]);
+                $messages[] = 'Noch '.(int)($result['remaining'] ?? 0).' von '.(int)($result['total'] ?? 0).' Aktivitäten offen. Nach dem Import einfach erneut auf "Jetzt synchronisieren" klicken, es geht chronologisch weiter.';
             }
 
             $info = empty($messages) ? null : implode(' ', $messages);
+
+            if (empty($pending) && !empty($messages)) {
+                return new JsonResponse(['success' => true, 'files' => [], 'message' => $info]);
+            }
         }
 
         if (empty($pending)) {
