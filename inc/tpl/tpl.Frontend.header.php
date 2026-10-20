@@ -134,11 +134,11 @@
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-climbs'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Anstiege</a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-segments'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Segmente</a></li>
                 <li class="separator"></li>
-                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-garmin-sync'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Garmin Connect sync'); ?></a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-garmin-sync'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Garmin Connect Sync</a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('multi-editor'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Multi editor'); ?></a></li>
                 <li class="separator"></li>
-                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-backup'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Database export'); ?></a></li>
-                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-backup-json'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Database import'); ?></a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-backup'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Datenbank-Export</a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-backup-json'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Datenbank-Import</a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-cleanup'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Database cleanup'); ?></a></li>
             </ul>
         </div>
