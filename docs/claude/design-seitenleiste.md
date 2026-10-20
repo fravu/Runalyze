@@ -1,27 +1,28 @@
-# Design: Seitenleiste, größere Schrift, ruhigere Tabellen (21.10.2026)
+# Design: obere Leiste, Icon-Leiste links, größere Schrift, ruhigere Tabellen (21.10.2026)
 
 Vorbild ist das neue Design von runalyze.com (siehe `runalyze-com-neuerungen.md`). Umgesetzt wurde bewusst nur ein Teil, und zwar ohne Less/gulp-Build.
 
 ## Was sich ändert
-- **Linke Seitenleiste:** Die Menüs stehen nicht mehr oben, sondern links, schmal (56 px) mit Icons. Ein Klick auf ein Icon klappt die Leiste auf (248 px, mit Namen) und das zugehörige Untermenü darunter aus (Akkordeon). Der Pfeil oben klappt alles ein und aus. Ein Klick auf einen Eintrag, außerhalb oder Escape klappt die Leiste wieder zu. Beim Darüberfahren zeigt der Browser den Namen als Tooltip.
-- **Oben** stehen Logo-Symbol, Ein-/Ausklappen, dann Konfiguration, Tools, Extras, Suche. **Unten** stehen Benutzer, Hilfe, Benachrichtigungen und "Neu".
+- **Obere Leiste** (54 px): links das Logo, in der Mitte ein **Suchfeld**, rechts runde Icons für **Neu** (+), **Hilfe** (Buch), **Benachrichtigungen** und **Profil** (gelber Kreis). Diese Menüs öffnen sich wie bisher beim Darüberfahren unter dem Icon.
+- **Suchfeld:** "Suche nach Tools, Einstellungen oder Seiten …". Es durchsucht alle Menüeinträge (Name und Menüname), zeigt bis zu 8 Treffer, Pfeiltasten und Enter wählen, Escape leert. Die Taste `/` springt ins Feld. Ein Treffer löst einen Klick auf den echten Menülink aus, die Fenster öffnen sich also wie sonst. Die Aktivitätssuche (Lupe links) bleibt davon getrennt.
+- **Linke Icon-Leiste** (56 px): **Haus** (Start, mit gelbem Rand wenn man auf dem Dashboard ist), Konfiguration, Tools, Extras, Aktivitäten suchen. Fährt man mit der Maus über ein Icon, erscheint daneben eine **Spalte in voller Höhe** (280 px) mit Überschrift und den Einträgen. Die Leiste selbst wird nicht breiter. Auf Touch-Geräten öffnet ein Tipp die Spalte.
 - **Schrift:** 13 px statt 11 px, Systemschrift (Segoe UI/Roboto/…) statt Verdana, Zeilenhöhe 1,45.
 - **Panels:** abgerundet (10 px), dezenter Schatten, Überschriften dunkelblau statt dunkelrot.
 - **Tabellen:** mehr Innenabstand, Kopfzeile fett mit kräftiger Linie, Zebrastreifen in hellem Blau, Hover-Zeile hellblau.
-- **Farben:** Leiste dunkelblau (#14213d), Akzent gelb (#fcbf49), kein Rot/Grün. Alle Werte sind CSS-Variablen am Anfang von `runalyze-sidebar.css` (`:root`).
-- **Tools:** Der Link zur Übersicht heißt jetzt "Alle Tools" im Tools-Untermenü (die Beschriftung selbst öffnet in der Leiste nur das Untermenü).
+- **Farben:** Leiste dunkelblau (#14213d), Spalte etwas heller (#1d3157), Akzent gelb (#fcbf49), kein Rot/Grün. Alle Werte sind CSS-Variablen am Anfang von `runalyze-sidebar.css` (`:root`).
+- **Tools:** Der Link zur Übersicht heißt "Alle Tools" im Tools-Untermenü (die Beschriftung selbst öffnet in der Leiste nur die Spalte).
 
-## Dateien
-- `web/assets/css/runalyze-sidebar.css` (neu, reines CSS).
-- `web/assets/js/runalyze-sidebar.js` (neu, reines JavaScript, kein Bündel).
-- Eingebunden in `app/Resources/views/base.html.twig` und `inc/tpl/tpl.Frontend.header.php`, jeweils nach dem Hauptstylesheet bzw. -skript. Die Versionsnummer ist das Änderungsdatum der Datei, ein neuer Stand landet also ohne Cache-Leeren im Browser.
-- Das Menü selbst steht weiter in `base_logged_in.twig` und `tpl.Frontend.header.php`. Die Leiste ist nur CSS/JS über diesem Markup.
+## Wie es technisch funktioniert
+- Das Menü steht weiter an **zwei Stellen** im Markup: `app/Resources/views/base_logged_in.twig` (alle Symfony-Seiten) und `inc/tpl/tpl.Frontend.header.php` (Dashboard).
+- `web/assets/js/runalyze-sidebar.js` verschiebt beim Laden (nur ab 801 px Breite) die linken Menüs (Konfiguration, Tools, Extras) und den Lupen-Link aus `#headline` in eine neue Leiste `#rz-sidebar`, baut das Haus und das Suchfeld ein und markiert die rechten Menüs per Klasse (`rz-plus`, `rz-help`, `rz-notify`, `rz-user`), damit CSS sie ordnet. Beim Verkleinern unter 801 px wird alles zurückgesetzt, das mobile Menü bleibt unverändert.
+- `web/assets/css/runalyze-sidebar.css` gestaltet obere Leiste, Icon-Leiste, Spalte, Suchfeld, Schrift, Panels und Tabellen.
+- Eingebunden in `base.html.twig` und `tpl.Frontend.header.php`, mit dem Änderungsdatum der Datei als Version (kein Cache-Leeren im Browser nötig).
 
 ## Grenzen
-- Gilt nur ab 801 px Breite. Darunter bleibt das bisherige mobile Menü.
-- Es gilt nur für Seiten mit `body#home` (alle Seiten nach dem Login).
-- Das Schriftbild betrifft die ganze Seite. Wo Spalten feste Breiten haben (Kalender, Wochenübersicht), kann es enger werden. Dann Schrift in `--rz-font-size` verkleinern.
-- Dark Mode, globale Suche und Karten-Look wie auf runalyze.com gibt es noch nicht.
+- Nur ab 801 px Breite und nur für Seiten mit `body#home` (alle Seiten nach dem Login).
+- Das Schriftbild betrifft die ganze Seite. Wo Spalten feste Breiten haben (Kalender, Wochenübersicht), kann es enger werden. Dann `--rz-font-size` verkleinern.
+- Dark Mode, Premium-/Erfolge-Symbole und der Karten-Look von runalyze.com gibt es nicht. Die Suche kennt nur die Menüeinträge, nicht Einstellungen im Inneren der Fenster.
+- Einige Beschriftungen in den Menüs sind weiter Englisch (z. B. "Privacy settings"), weil die deutsche Übersetzung fehlt.
 
 ## Rückgängig
 `git revert <commit>`. Danach `rm -rf var/cache/prod`.
