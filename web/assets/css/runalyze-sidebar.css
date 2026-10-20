@@ -25,6 +25,7 @@
 	--rz-row-odd: rgba(237, 242, 251, 0.75);
 	--rz-row-hover: rgba(214, 228, 255, 0.9);
 	--rz-radius: 10px;
+	--rz-page-bg: #f6f8fc;
 }
 
 /* ---------- Schrift ---------- */
@@ -39,7 +40,38 @@ input, select, textarea, button {
 	font-family: inherit;
 }
 
-/* ---------- Panels ---------- */
+/* ---------- Flaches Layout: keine Kacheln, kein Hintergrundbild ---------- */
+body#home {
+	background-image: none !important;
+	background-color: var(--rz-page-bg);
+}
+
+#home #container .panel {
+	margin: 0 5px 22px;
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+#home #container .panel-heading {
+	padding: 6px 4px;
+	border-bottom: 1px solid var(--rz-border);
+}
+
+/* Das Icon-Menü rechts oben ragte ohne Kachelrand 1 px über den Kalender hinaus (Scrollleiste) */
+#home #container .panel-menu {
+	margin-right: 1px;
+}
+
+/* Rechte Spalte durch eine feine Linie abgesetzt */
+#home #panels {
+	box-sizing: border-box;
+	padding-left: 10px;
+	border-left: 1px solid var(--rz-border);
+}
+
+/* ---------- Panels (Fenster u. a.) ---------- */
 .panel {
 	border: 1px solid var(--rz-border);
 	border-radius: var(--rz-radius);
