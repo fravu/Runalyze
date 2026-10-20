@@ -122,8 +122,24 @@
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-vo2max-analysis'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Analyze your VO2max'); ?></a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-tables'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Running tables'); ?></a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('poster'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Poster generator'); ?></a></li>
+            </ul>
+        </div>
+
+        <div class="headline-menu left">
+            <div class="submenu-label b">
+                <i class="fa fa-fw fa-lg fa-ellipsis-h"></i>&nbsp;Extras
+            </div>
+            <ul class="submenu">
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-heatmap'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Heatmap</a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-climbs'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Anstiege</a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-segments'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Segmente</a></li>
                 <li class="separator"></li>
-                <li><a class="window" href="<?php echo $this->get('router')->generate('tools'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('More'); ?></a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-garmin-sync'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Garmin Connect sync'); ?></a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('multi-editor'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Multi editor'); ?></a></li>
+                <li class="separator"></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-backup'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Database export'); ?></a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-backup-json'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Database import'); ?></a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-cleanup'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Database cleanup'); ?></a></li>
             </ul>
         </div>
 
