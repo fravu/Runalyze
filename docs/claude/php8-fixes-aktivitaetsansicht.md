@@ -12,3 +12,10 @@ Seit dem Umstieg schreibt `var/logs/prod.log` die Zeiten in UTC (zwei Stunden hi
 
 ## Weitere Fehler dieser Art
 Selten genutzte Ansichten können unter PHP 8 weitere TypeErrors bei Streckendaten werfen. Vorgehen: `grep CRITICAL var/logs/prod.log | tail`, Zeile und Aufrufer lesen, Werte vor der Rechnung in Zahlen umwandeln.
+
+## Dashboard ohne Sitzung: 500 statt Login (behoben 21.10.2026)
+Ursache: `@Security("has_role('ROLE_USER')")` wird vom SensioFrameworkExtra-`SecurityListener` erst bei `kernel.controller_arguments` geprüft, also **nach** dem Auflösen der Argumente. Ohne Login findet `AccountValueResolver` keinen `Account`, und Symfony wirft "requires that you provide a value for the $account argument" (CRITICAL, HTTP 500). Das betraf alle Aktionen mit `Account $account` (Dashboard, Feedback usw.) und trat schon unter PHP 7.4 auf.
+
+Fix in `src/CoreBundle/ArgumentResolver/AccountValueResolver.php`: Ist kein `Account` angemeldet und das Argument nicht optional, wirft der Resolver eine `AccessDeniedException`. Die Firewall leitet anonyme Nutzer daraufhin zum Login um.
+
+Getestet: `/dashboard` und `/feedback` ohne Sitzung antworten mit 302 auf `/en/login`, die Login-Seite mit 200, kein neuer Logeintrag.
