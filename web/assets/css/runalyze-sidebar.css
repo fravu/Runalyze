@@ -26,6 +26,7 @@
 	--rz-row-hover: rgba(214, 228, 255, 0.9);
 	--rz-radius: 10px;
 	--rz-page-bg: #f6f8fc;
+	--rz-divider: #8a99b8;
 }
 
 /* ---------- Schrift ---------- */
@@ -56,7 +57,7 @@ body#home {
 
 #home #container .panel-heading {
 	padding: 6px 4px;
-	border-bottom: 1px solid var(--rz-border);
+	border-bottom: 1px solid var(--rz-divider);
 }
 
 /* Das Icon-Menü rechts oben ragte ohne Kachelrand 1 px über den Kalender hinaus (Scrollleiste) */
@@ -67,8 +68,8 @@ body#home {
 /* Rechte Spalte durch eine feine Linie abgesetzt */
 #home #panels {
 	box-sizing: border-box;
-	padding-left: 10px;
-	border-left: 1px solid var(--rz-border);
+	padding-left: 12px;
+	border-left: 2px solid var(--rz-divider);
 }
 
 /* ---------- Panels (Fenster u. a.) ---------- */
