@@ -114,9 +114,15 @@ class TableZonesHeartrate extends TableZonesAbstract {
 		// the histogram of bpm is already "summarized", so a bpm is only one time in the histogram
 		// sort it in key order: key=bpm value=sumarized seconds
 		$sortHist = $Distribution->histogram();
+		// PHP 8: empty/non-numeric heart rate values end up as string keys and break the int-typed zone calculation
+		$sortHist = array_filter($sortHist, 'is_numeric', ARRAY_FILTER_USE_KEY);
 		ksort($sortHist);
 
-		$defaultZones = $this->getZones(array_key_first($sortHist), array_key_last($sortHist), $hrMax, $footerHintMaxHr);
+		if (empty($sortHist)) {
+			return $Zones;
+		}
+
+		$defaultZones = $this->getZones((int)array_key_first($sortHist), (int)array_key_last($sortHist), $hrMax, $footerHintMaxHr);
 
 		foreach ($sortHist as $bpm => $seconds) {
 			// index is 1-n of the relevant key to use

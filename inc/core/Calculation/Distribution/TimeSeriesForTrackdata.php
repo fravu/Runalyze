@@ -81,10 +81,10 @@ class TimeSeriesForTrackdata extends TimeSeries
                 $this->Data[$val][$key] += $rawdata[$key][$i] - $prev;
             }
 
-            $timeDiff = $i == 0 ? $time[0] : $time[$i] - $time[$i - 1];
+            $timeDiff = $i == 0 ? (float)$time[0] : (float)$time[$i] - (float)$time[$i - 1];
 
             foreach ($this->AvgValuesKeys as $key) {
-                $this->Data[$val][$key] += $rawdata[$key][$i] * $timeDiff;
+                $this->Data[$val][$key] += (float)$rawdata[$key][$i] * $timeDiff;
             }
         }
 
