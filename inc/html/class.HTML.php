@@ -299,7 +299,7 @@ class HTML {
 				}
 			}
 
-			$html .= '<option value="'.$value.'"'.self::Selected($value, $selected).implode($additionalAttributes, '').'>'.$displayedText.'</option>';
+			$html .= '<option value="'.$value.'"'.self::Selected($value, $selected).implode('', $additionalAttributes).'>'.$displayedText.'</option>';
 		}
 
 		return $html.'</select>';

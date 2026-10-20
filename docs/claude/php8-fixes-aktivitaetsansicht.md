@@ -19,3 +19,11 @@ Ursache: `@Security("has_role('ROLE_USER')")` wird vom SensioFrameworkExtra-`Sec
 Fix in `src/CoreBundle/ArgumentResolver/AccountValueResolver.php`: Ist kein `Account` angemeldet und das Argument nicht optional, wirft der Resolver eine `AccessDeniedException`. Die Firewall leitet anonyme Nutzer daraufhin zum Login um.
 
 Getestet: `/dashboard` und `/feedback` ohne Sitzung antworten mit 302 auf `/en/login`, die Login-Seite mit 200, kein neuer Logeintrag.
+
+## Suche: 500er und "0 Trainings gefunden" (behoben 21.10.2026)
+1. `inc/html/class.HTML.php:302`: `implode($additionalAttributes, '')` ist unter PHP 8 verboten (alte Argumentreihenfolge, `implode(): Argument #1 ($separator) must be of type string, array given`). Fix: `implode('', $additionalAttributes)`. Danach ließ sich die Suchmaske öffnen. Weitere `implode`-Aufrufe mit Array zuerst gibt es im Code nicht (per grep geprüft).
+2. `inc/html/formular/class.FormularValueParser.php`, `parseTime()`: Ein leeres Feld (`''`) wurde mit `$value == 0` geprüft. Unter PHP 7.4 ist `'' == 0` wahr, unter PHP 8 falsch. Das Dauer-Feld der Suche zeigte deshalb `0:00` statt leer und die Suche filterte auf Dauer = 0, also immer "0 Trainings". Fix: leere Werte werden ausdrücklich geprüft.
+
+Getestet im Browser: Suchmaske öffnet, Dauer ist leer, die Suche findet 2043 Trainings. Das Log hat keinen neuen Eintrag.
+
+Typisches PHP-8-Muster für weitere Fehler: `'' == 0`, `null == 0` und `'abc' == 0` verhalten sich anders, ebenso `implode(array, string)`, Zugriff auf nicht existierende Array-Schlüssel (Warnung) und Typfehler bei int/string-Argumenten.

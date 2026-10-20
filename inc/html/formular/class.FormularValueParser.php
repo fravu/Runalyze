@@ -152,7 +152,8 @@ class FormularValueParser {
 	 * @param array $options
 	 */
 	private static function parseTime(&$value, $options) {
-		if ($value == 0) {
+		// PHP 8: '' == 0 is false, so empty values have to be checked explicitly
+		if ($value === '' || $value === null || (float)$value == 0) {
 			if (isset($options['hide-empty'])) {
 				$value = '';
 			} else {
