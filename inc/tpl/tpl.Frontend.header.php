@@ -9,6 +9,7 @@
     <script data-pace-options='{"ajax": {"ignoreURLs": ["_internal/notifications", "_wdt/"]}, "document": true }' src="vendor/pace/pace.min.js"></script>
 
     <link rel="stylesheet" href="assets/css/runalyze-style.css?v=<?php echo @filemtime(__DIR__.'/../../web/assets/css/runalyze-style.css') ?: RUNALYZE_VERSION; ?>">
+    <link rel="stylesheet" href="assets/css/runalyze-sidebar.css?v=<?php echo @filemtime(__DIR__.'/../../web/assets/css/runalyze-sidebar.css') ?: RUNALYZE_VERSION; ?>">
 
 	<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 	<link rel="manifest" href="assets/appmanifest.json">
@@ -19,6 +20,7 @@
 
     <script>document.addEventListener("touchstart", function(){}, true);</script>
     <script src="assets/js/scripts.min.js?v=<?php echo @filemtime(__DIR__.'/../../web/assets/js/scripts.min.js') ?: RUNALYZE_VERSION; ?>"></script>
+    <script defer src="assets/js/runalyze-sidebar.js?v=<?php echo @filemtime(__DIR__.'/../../web/assets/js/runalyze-sidebar.js') ?: RUNALYZE_VERSION; ?>"></script>
 </head>
 
 <body id="home" style="background-image:url(<?php echo \Runalyze\Configuration::Design()->backgroundImage(); ?>);">
@@ -122,6 +124,8 @@
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-vo2max-analysis'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Analyze your VO2max'); ?></a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-tables'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Running tables'); ?></a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('poster'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Poster generator'); ?></a></li>
+                <li class="separator"></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Alle Tools</a></li>
             </ul>
         </div>
 

@@ -1,0 +1,328 @@
+/*
+ * Seitenleiste, Schrift und Tabellen (Oktober 2026).
+ * Bewusst getrennt von runalyze-style.css (Less/gulp), damit kein Build nötig ist.
+ * Farben: Blau/Gelb mit hohem Kontrast, kein Rot/Grün. Alle Farben sind Variablen.
+ */
+:root {
+	--rz-nav-bg: #14213d;
+	--rz-nav-text: #cfd8ea;
+	--rz-nav-text-hover: #ffffff;
+	--rz-nav-accent: #fcbf49;
+	--rz-nav-hover-bg: rgba(255, 255, 255, 0.09);
+	--rz-nav-line: rgba(255, 255, 255, 0.12);
+	--rz-nav-width: 56px;
+	--rz-nav-width-open: 248px;
+
+	--rz-font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+	--rz-font-size: 13px;
+	--rz-heading: #1d3557;
+	--rz-border: #d5dbe8;
+	--rz-table-head-border: #b8c3d9;
+	--rz-row-odd: rgba(237, 242, 251, 0.75);
+	--rz-row-hover: rgba(214, 228, 255, 0.9);
+	--rz-radius: 10px;
+}
+
+/* ---------- Schrift ---------- */
+body {
+	font-family: var(--rz-font);
+	font-size: var(--rz-font-size);
+	line-height: 1.45;
+	-webkit-font-smoothing: antialiased;
+}
+
+input, select, textarea, button {
+	font-family: inherit;
+}
+
+/* ---------- Panels ---------- */
+.panel {
+	border: 1px solid var(--rz-border);
+	border-radius: var(--rz-radius);
+	box-shadow: 0 1px 4px rgba(20, 33, 61, 0.08);
+	background: rgba(255, 255, 255, 0.97);
+}
+
+.panel-heading h1,
+.panel-content h1 {
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	color: var(--rz-heading);
+}
+
+.panel-heading {
+	border-bottom-color: var(--rz-border);
+}
+
+/* ---------- Tabellen ---------- */
+#home table td,
+#home table th {
+	padding: 5px 8px;
+}
+
+#home thead th,
+#home tbody.asThead th {
+	font-weight: 600;
+	color: var(--rz-heading);
+	border-bottom: 2px solid var(--rz-table-head-border);
+}
+
+#home .zebra-style tbody tr {
+	border-top-color: rgba(184, 195, 217, 0.45);
+	transition: background-color 0.12s ease;
+}
+
+#home .zebra-style tbody tr:nth-child(odd) {
+	background-color: var(--rz-row-odd);
+}
+
+#home .zebra-style tbody tr:hover {
+	background-color: var(--rz-row-hover);
+}
+
+/* ---------- Seitenleiste (nur Desktop) ---------- */
+@media (min-width: 801px) {
+	body#home {
+		padding-top: 0;
+		padding-left: var(--rz-nav-width);
+	}
+
+	#home #headline {
+		display: flex;
+		flex-direction: column;
+		width: var(--rz-nav-width);
+		height: 100%;
+		bottom: 0;
+		padding-bottom: 8px;
+		overflow-x: hidden;
+		overflow-y: auto;
+		background: var(--rz-nav-bg);
+		border-bottom: 0;
+		border-right: 1px solid var(--rz-nav-line);
+		transition: width 0.2s ease, box-shadow 0.2s ease;
+		scrollbar-width: thin;
+	}
+
+	#home #headline.sidebar-expanded {
+		width: var(--rz-nav-width-open);
+		box-shadow: 6px 0 22px rgba(10, 18, 40, 0.35);
+	}
+
+	#home #menu-link {
+		display: none;
+	}
+
+	/* Einträge untereinander, nur Icons */
+	#home #headline .tab,
+	#home #headline .headline-menu {
+		float: none;
+		display: block;
+		width: 100%;
+		margin: 0;
+		padding: 0;
+		order: 10;
+	}
+
+	#home #headline .headline-menu.right {
+		order: 30;
+	}
+
+	#home #headline .headline-menu.right:first-of-type {
+		margin-top: auto;
+	}
+
+	#home #headline .submenu-label,
+	#home #headline a.tab:not(.logo) {
+		display: flex;
+		align-items: center;
+		min-height: 44px;
+		padding: 0 16px;
+		margin: 0;
+		font-size: 0;
+		white-space: nowrap;
+		color: var(--rz-nav-text);
+		border-left: 3px solid transparent;
+		cursor: pointer;
+		transition: background-color 0.12s ease, color 0.12s ease;
+	}
+
+	#home #headline .submenu-label a:link,
+	#home #headline .submenu-label a:visited {
+		display: flex;
+		align-items: center;
+		color: inherit;
+	}
+
+	#home #headline .submenu-label i.fa,
+	#home #headline a.tab:not(.logo) i.fa {
+		flex: none;
+		width: 24px;
+		font-size: 19px !important;
+		line-height: 1;
+		text-align: center;
+		margin-right: 0;
+	}
+
+	#home #headline.sidebar-expanded .submenu-label,
+	#home #headline.sidebar-expanded a.tab:not(.logo) {
+		font-size: 14px;
+	}
+
+	#home #headline.sidebar-expanded .submenu-label i.fa,
+	#home #headline.sidebar-expanded a.tab:not(.logo) i.fa {
+		margin-right: 10px;
+	}
+
+	/* Nur-Icon-Einträge: Name im ausgeklappten Zustand, Pfeilchen weg */
+	#home #headline .submenu-label i.fa-caret-down {
+		display: none;
+	}
+
+	#home #headline.sidebar-expanded [data-sidebar-label]::after {
+		content: attr(data-sidebar-label);
+	}
+
+	#home #headline .submenu-label:hover,
+	#home #headline a.tab:not(.logo):hover,
+	#home #headline .headline-menu:hover .submenu-label,
+	#home #headline .headline-menu:hover .submenu-label a:link,
+	#home #headline .headline-menu:hover .submenu-label a:visited,
+	#home #headline .headline-menu:hover .submenu-label a:hover {
+		color: var(--rz-nav-text-hover);
+	}
+
+	#home #headline .submenu-label:hover,
+	#home #headline a.tab:not(.logo):hover {
+		background: var(--rz-nav-hover-bg);
+	}
+
+	#home #headline .headline-menu.open > .submenu-label {
+		color: var(--rz-nav-text-hover);
+		background: var(--rz-nav-hover-bg);
+		border-left-color: var(--rz-nav-accent);
+	}
+
+	#home #headline .headline-menu.open > .submenu-label i.fa {
+		color: var(--rz-nav-accent);
+	}
+
+	/* Untermenüs: im ausgeklappten Zustand unter dem Eintrag, sonst nie */
+	#home #headline .headline-menu .submenu,
+	#home #headline .headline-menu:hover .submenu {
+		display: none;
+		position: static;
+		min-width: 0;
+		width: 100%;
+		border: 0;
+	}
+
+	#home #headline.sidebar-expanded .headline-menu.open .submenu,
+	#home #headline.sidebar-expanded .headline-menu.open:hover .submenu {
+		display: block;
+		padding: 2px 0 8px;
+		background: rgba(0, 0, 0, 0.18);
+	}
+
+	#home #headline .headline-menu .submenu li {
+		background: transparent;
+		margin: 0;
+		padding: 0;
+	}
+
+	#home #headline .headline-menu .submenu li a,
+	#home #headline .headline-menu .submenu li .no-link {
+		padding: 8px 16px 8px 53px;
+		font-size: 13px;
+		color: var(--rz-nav-text);
+	}
+
+	#home #headline .headline-menu .submenu li a:hover {
+		color: var(--rz-nav-accent);
+		background: var(--rz-nav-hover-bg);
+	}
+
+	#home #headline .headline-menu .submenu li a .fa {
+		display: none;
+	}
+
+	#home #headline .headline-menu .submenu li.separator {
+		height: 1px;
+		width: auto;
+		margin: 6px 16px 6px 53px;
+		background: var(--rz-nav-line);
+	}
+
+	#new-notifications-menu .submenu {
+		width: 100%;
+	}
+
+	/* Logo: im schmalen Zustand nur ein Symbol */
+	#home #headline .logo {
+		order: 0;
+		display: block;
+		width: 100%;
+		height: 56px;
+		margin: 0;
+		padding: 0;
+		font-size: 0;
+		text-indent: 0;
+		background: none no-repeat 18px center;
+		background-size: auto 20px;
+		overflow: hidden;
+	}
+
+	#home #headline .logo::before {
+		content: "\f21e";
+		display: block;
+		width: var(--rz-nav-width);
+		font-family: FontAwesome;
+		font-size: 24px;
+		line-height: 56px;
+		text-align: center;
+		color: var(--rz-nav-accent);
+	}
+
+	#home #headline.sidebar-expanded .logo {
+		background-image: url(../images/runalyze-header-swoosh.png);
+		background-position: 16px center;
+	}
+
+	#home #headline.sidebar-expanded .logo::before {
+		display: none;
+	}
+
+	/* Ein-/Ausklappen */
+	#home #headline .sidebar-toggle {
+		order: 1;
+		flex: none;
+		display: flex;
+		align-items: center;
+		width: 100%;
+		min-height: 36px;
+		padding: 0 16px;
+		margin: 0 0 6px;
+		font-size: 0;
+		color: var(--rz-nav-text);
+		background: none;
+		border: 0;
+		border-bottom: 1px solid var(--rz-nav-line);
+		cursor: pointer;
+	}
+
+	#home #headline .sidebar-toggle i.fa {
+		width: 24px;
+		font-size: 18px;
+		text-align: center;
+		transition: transform 0.2s ease;
+	}
+
+	#home #headline .sidebar-toggle:hover {
+		color: var(--rz-nav-text-hover);
+		background: var(--rz-nav-hover-bg);
+	}
+
+	#home #headline.sidebar-expanded .sidebar-toggle i.fa {
+		transform: rotate(180deg);
+	}
+}
