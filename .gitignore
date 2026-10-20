@@ -12,3 +12,31 @@ data/garmin_session/
 data/import/garmin_sync/
 __pycache__/
 *.pyc
+
+# server-local configuration and runtime data - never commit
+# (data/config.yml contains database credentials and the secret)
+data/config.yml
+data/garmin_venv/
+data/cache-/
+data/sessions/
+data/backup-tool/backup/*
+!data/backup-tool/backup/.htaccess
+data/backup-tool/import/*
+!data/backup-tool/import/.htaccess
+data/import/*
+!data/import/activity/
+data/import/activity/*
+!data/import/activity/failed/
+data/import/activity/failed/*
+!data/import/activity/failed/.gitkeep
+data/poster/*
+!data/poster/.gitkeep
+data/srtm/*
+!data/srtm/.gitkeep
+data/views/notifications/*
+!data/views/notifications/.gitkeep
+var/cache/*
+!var/cache/.gitkeep
+var/logs/*
+!var/logs/.gitkeep
+var/sessions/
