@@ -20,3 +20,12 @@
 5. `rm -rf var/cache/prod var/cache/doctrine` und `data/cache-/*/*.txt` löschen.
 6. Testen: Dashboard, Aktivität öffnen und bearbeiten, Import, Garmin-Sync, Tools. Dabei `var/logs/prod.log` auf `CRITICAL` prüfen.
 7. Rückweg: Socket bzw. Modul wieder auf 7.4 umstellen. 7.4 bleibt installiert.
+
+## Durchgeführt am 20.10.2026
+- Backup: `~/runalyze-2026-10-20-2328.sql` (Benutzer root, 143 MB).
+- Apache: `a2dismod php7.4`, `a2enmod php8.5` (mod_php, Prefork), Apache neu gestartet um 23:30.
+- `/etc/php/8.5/apache2/php.ini`: `memory_limit = 326M` (zuvor 128M, Ursache der OutOfMemory-Fehler beim Garmin-Import, siehe `analyse-out-of-memory-fit-import.md`).
+- `var/cache/prod` und `var/cache/doctrine` gelöscht, Cache wurde um 23:31 neu aufgebaut.
+- Prüfung ohne Login: Startseite und `/de/login` liefern 200. Ein einzelner Fatal Error um 23:30:14 (Container-Datei fehlte) stammt von einer Anfrage während des Cache-Neuaufbaus und trat nicht wieder auf.
+- Offen: Dashboard, Import, Multi-Editor, Garmin-Sync, Tools mit Login testen und danach `grep CRITICAL var/logs/prod.log` prüfen.
+- Rückweg: `a2dismod php8.5 && a2enmod php7.4 && systemctl restart apache2`, danach Cache löschen.
