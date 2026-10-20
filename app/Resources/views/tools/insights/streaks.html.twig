@@ -1,0 +1,68 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/insights/_common.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Streaks</h1>
+    </div>
+
+    <div class="panel-content">
+        <form id="in-filter" class="in-filter" onsubmit="return false;">
+            <select name="sport">
+                <option value="0">Alle Sportarten</option>
+                {% for s in sports %}
+                    <option value="{{ s.id }}"{% if sport == s.id %} selected{% endif %}>{{ s.name }} ({{ s.num }})</option>
+                {% endfor %}
+            </select>
+            <label>Mindestens <input type="text" name="min" value="{{ min|number_format(1, ',', '') }}" size="4" style="text-align:right;"> km pro Tag</label>
+            <button type="button" id="in-apply">Anzeigen</button>
+        </form>
+
+        <div class="in-kv">
+            <div>
+                <strong>{{ current ? current.days ~ ' Tage' : '0 Tage' }}</strong>
+                <small>Aktuelle Serie{% if current %} seit {{ current.startText }}{% endif %}</small>
+            </div>
+            <div>
+                <strong>{{ longest ? longest.days ~ ' Tage' : '–' }}</strong>
+                <small>Längste Serie{% if longest %} ({{ longest.startText }} bis {{ longest.endText }}){% endif %}</small>
+            </div>
+            <div>
+                <strong>{{ activeDays }}</strong>
+                <small>Tage mit Aktivität{% if min > 0 %} (ab {{ min|number_format(1, ',', '.') }} km){% endif %}</small>
+            </div>
+        </div>
+
+        <table class="fullwidth zebra-style in-table">
+            <thead>
+                <tr><th>#</th><th>Von</th><th>Bis</th><th class="r">Tage</th><th class="r">Distanz</th><th class="r">Dauer</th></tr>
+            </thead>
+            <tbody>
+                {% for s in streaks %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ s.startText }}</td>
+                        <td>{{ s.endText }}</td>
+                        <td class="r"><strong>{{ s.days }}</strong></td>
+                        <td class="r">{{ s.kmText }} km</td>
+                        <td class="r">{{ s.durationText }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6"><em>Keine Serien gefunden.</em></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="in-note">Eine Serie sind aufeinanderfolgende Tage mit mindestens einer Aktivität (oder mindestens der angegebenen Tagesdistanz, summiert über alle Aktivitäten des Tages). Die aktuelle Serie zählt, wenn sie heute oder gestern endet. Gezeigt werden die 15 längsten.</p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+        $('#in-apply').on('click', function() {
+            $('#ajax').loadDiv('{{ url('tools-streaks') }}?' + $('#in-filter').serialize());
+        });
+        $('#in-filter select').on('change', function() { $('#in-apply').click(); });
+    })(jQuery);
+    </script>
+{% endblock %}

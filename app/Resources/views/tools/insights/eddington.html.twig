@@ -1,0 +1,77 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/insights/_common.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Eddington-Zahl</h1>
+    </div>
+
+    <div class="panel-content">
+        <form id="in-filter" class="in-filter" onsubmit="return false;">
+            <select name="sport">
+                <option value="0">Alle Sportarten</option>
+                {% for s in sports %}
+                    <option value="{{ s.id }}"{% if sport == s.id %} selected{% endif %}>{{ s.name }} ({{ s.num }})</option>
+                {% endfor %}
+            </select>
+            <select name="unit">
+                <option value="km"{% if not miles %} selected{% endif %}>Kilometer</option>
+                <option value="mi"{% if miles %} selected{% endif %}>Meilen</option>
+            </select>
+        </form>
+
+        {% set unit = miles ? 'Meilen' : 'km' %}
+        <div class="in-kv">
+            <div>
+                <strong>{{ result.number }}</strong>
+                <small>Eddington-Zahl: {{ result.number }} Tage mit mindestens {{ result.number }} {{ unit }}</small>
+            </div>
+            <div>
+                <strong>{{ result.missing }}</strong>
+                <small>Noch {{ result.missing }} Tage mit mindestens {{ result.next }} {{ unit }} bis {{ result.next }}</small>
+            </div>
+            <div>
+                <strong>{{ result.totalDays }}</strong>
+                <small>Tage mit Aktivität</small>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:32px; flex-wrap:wrap;">
+            <div>
+                <table class="zebra-style in-table">
+                    <thead><tr><th class="r">Ab {{ unit }}</th><th class="r">Tage</th><th class="r">Fehlt</th></tr></thead>
+                    <tbody>
+                        {% for c in result.counts %}
+                            <tr{% if c.n == result.number %} style="font-weight:bold;"{% endif %}>
+                                <td class="r">{{ c.n }}</td>
+                                <td class="r">{{ c.days }}</td>
+                                <td class="r">{{ c.days >= c.n ? '✓' : (c.n - c.days) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <table class="zebra-style in-table">
+                    <thead><tr><th>Jahr</th><th class="r">Eddington-Zahl am Jahresende</th></tr></thead>
+                    <tbody>
+                        {% for h in result.history|reverse %}
+                            <tr><td>{{ h.year }}</td><td class="r">{{ h.number }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="in-note">Die Eddington-Zahl E ist die größte Zahl, für die es mindestens E Tage mit mindestens E {{ unit }} gibt. Distanzen werden pro Tag über alle Aktivitäten der gewählten Sportart summiert. In der Tabelle zeigt "Fehlt", wie viele Tage ab dieser Distanz noch nötig wären.</p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+        $('#in-filter select').on('change', function() {
+            $('#ajax').loadDiv('{{ url('tools-eddington') }}?' + $('#in-filter').serialize());
+        });
+    })(jQuery);
+    </script>
+{% endblock %}

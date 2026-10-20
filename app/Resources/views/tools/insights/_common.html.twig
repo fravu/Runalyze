@@ -1,0 +1,23 @@
+<style>
+    .in-kv { display:flex; flex-wrap:wrap; gap:6px 32px; margin:8px 0 14px; }
+    .in-kv div strong { display:block; font-size:22px; color:#1d3557; }
+    .in-kv div small { color:#667491; }
+    .in-table td.r, .in-table th.r { text-align:right; }
+    .in-filter { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin:6px 0 12px; }
+    .in-chart { width:100%; height:260px; display:block; background:#fff; border:1px solid #d5dbe8; border-radius:6px; }
+    .in-chart text { font-size:11px; fill:#667491; }
+    .in-chart .grid { stroke:#e3e8f2; stroke-width:1; }
+    .in-chart .line { fill:none; stroke:#1f5fbf; stroke-width:2; }
+    .in-chart .dot { fill:#fcbf49; stroke:#14213d; stroke-width:1.5; }
+    .in-chart .area { fill:rgba(31,95,191,.12); stroke:none; }
+    .in-note { color:#667491; font-size:12px; margin:8px 0; }
+</style>
+
+<div class="panel-menu">
+    <ul>
+        <li><a class="ajax" target="ajax" href="{{ url('tools-streaks') }}">Streaks</a></li>
+        <li><a class="ajax" target="ajax" href="{{ url('tools-eddington') }}">Eddington</a></li>
+        <li><a class="ajax" target="ajax" href="{{ url('tools-moving-mileage') }}">Gleitende Kilometer</a></li>
+        <li><a class="ajax" target="ajax" href="{{ url('tools-performance-curves') }}">Leistungskurven</a></li>
+    </ul>
+</div>

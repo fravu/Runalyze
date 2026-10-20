@@ -1,0 +1,149 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/insights/_common.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Gleitende Kilometer</h1>
+    </div>
+
+    <div class="panel-content">
+        <form id="in-filter" class="in-filter" onsubmit="return false;">
+            <select name="sport" id="in-sport">
+                <option value="0">Alle Sportarten</option>
+                {% for s in sports %}
+                    <option value="{{ s.id }}"{% if sport == s.id %} selected{% endif %}>{{ s.name }} ({{ s.num }})</option>
+                {% endfor %}
+            </select>
+            <label>Zeitraum
+                <select id="in-window">
+                    <option value="7">7 Tage</option>
+                    <option value="30" selected>30 Tage</option>
+                    <option value="90">90 Tage</option>
+                    <option value="180">180 Tage</option>
+                    <option value="365">365 Tage</option>
+                </select>
+            </label>
+            <label>Wert
+                <select id="in-scale">
+                    <option value="sum" selected>Summe</option>
+                    <option value="day">Ø pro Tag</option>
+                    <option value="week">Ø pro Woche</option>
+                    <option value="month">Ø pro Monat</option>
+                </select>
+            </label>
+        </form>
+
+        {% if series.km|length == 0 %}
+            <p><em>Keine Aktivitäten gefunden.</em></p>
+        {% else %}
+            <div class="in-kv" id="in-stats"></div>
+            <svg id="in-chart" class="in-chart" viewBox="0 0 900 260" preserveAspectRatio="none"></svg>
+            <p class="in-note" id="in-hover">Mit der Maus über das Diagramm fahren, um einzelne Tage zu sehen.</p>
+            <p class="in-note">Für jeden Tag die Kilometer der vorangegangenen Tage (einschließlich dieses Tages), ohne feste Wochen oder Monate.</p>
+        {% endif %}
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+
+        $('#in-sport').on('change', function() {
+            $('#ajax').loadDiv('{{ url('tools-moving-mileage') }}?' + $('#in-filter').serialize());
+        });
+
+        var start = {{ series.start|json_encode|raw }};
+        var km = {{ series.km|json_encode|raw }};
+
+        if (!km.length) { return; }
+
+        var svg = document.getElementById('in-chart');
+        var NS = 'http://www.w3.org/2000/svg';
+        var points = [];
+
+        function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+        function dateOf(i) {
+            var p = start.split('-');
+            var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + i));
+            return pad(d.getUTCDate()) + '.' + pad(d.getUTCMonth() + 1) + '.' + d.getUTCFullYear();
+        }
+
+        function fmt(v) { return v.toLocaleString('de-DE', { maximumFractionDigits: 1, minimumFractionDigits: 1 }); }
+
+        function make(tag, attrs) {
+            var el = document.createElementNS(NS, tag);
+            Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+            return el;
+        }
+
+        function render() {
+            var win = parseInt($('#in-window').val(), 10);
+            var scale = $('#in-scale').val();
+            var factor = scale === 'sum' ? 1 : (scale === 'day' ? 1 / win : (scale === 'week' ? 7 / win : 30.4375 / win));
+            var unit = scale === 'sum' ? 'km' : (scale === 'day' ? 'km/Tag' : (scale === 'week' ? 'km/Woche' : 'km/Monat'));
+            var sum = 0;
+            points = [];
+
+            for (var i = 0; i < km.length; i++) {
+                sum += km[i];
+                if (i >= win) { sum -= km[i - win]; }
+                if (i >= win - 1) { points.push({ i: i, v: sum * factor }); }
+            }
+
+            if (!points.length) { return; }
+
+            var max = 0, maxAt = 0, total = 0;
+            points.forEach(function (p, k) { total += p.v; if (p.v > max) { max = p.v; maxAt = k; } });
+
+            $('#in-stats').html(
+                '<div><strong>' + fmt(points[points.length - 1].v) + ' ' + unit + '</strong><small>Aktuell (' + dateOf(points[points.length - 1].i) + ')</small></div>' +
+                '<div><strong>' + fmt(max) + ' ' + unit + '</strong><small>Höchstwert (' + dateOf(points[maxAt].i) + ')</small></div>' +
+                '<div><strong>' + fmt(total / points.length) + ' ' + unit + '</strong><small>Durchschnitt über alle Tage</small></div>'
+            );
+
+            while (svg.firstChild) { svg.removeChild(svg.firstChild); }
+
+            var W = 900, H = 260, L = 48, R = 10, T = 12, B = 24;
+            var top = max > 0 ? max * 1.08 : 1;
+            var x = function (k) { return L + (W - L - R) * (points.length > 1 ? k / (points.length - 1) : 0); };
+            var y = function (v) { return T + (H - T - B) * (1 - v / top); };
+
+            for (var g = 0; g <= 4; g++) {
+                var gv = top * g / 4;
+                svg.appendChild(make('line', { x1: L, x2: W - R, y1: y(gv), y2: y(gv), 'class': 'grid' }));
+                var label = make('text', { x: L - 6, y: y(gv) + 4, 'text-anchor': 'end' });
+                label.textContent = Math.round(gv);
+                svg.appendChild(label);
+            }
+
+            // year labels
+            var lastYear = null;
+            points.forEach(function (p, k) {
+                var year = dateOf(p.i).slice(-4);
+                if (year !== lastYear) {
+                    lastYear = year;
+                    var t = make('text', { x: x(k), y: H - 6, 'text-anchor': 'start' });
+                    t.textContent = year;
+                    svg.appendChild(t);
+                }
+            });
+
+            var line = points.map(function (p, k) { return (k ? 'L' : 'M') + x(k).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' ');
+            svg.appendChild(make('path', { d: line + ' L' + x(points.length - 1).toFixed(1) + ' ' + y(0) + ' L' + x(0).toFixed(1) + ' ' + y(0) + ' Z', 'class': 'area' }));
+            svg.appendChild(make('path', { d: line, 'class': 'line' }));
+            svg.appendChild(make('circle', { cx: x(maxAt), cy: y(max), r: 4, 'class': 'dot' }));
+
+            svg.onmousemove = function (e) {
+                var rect = svg.getBoundingClientRect();
+                var px = (e.clientX - rect.left) / rect.width * W;
+                var k = Math.max(0, Math.min(points.length - 1, Math.round((px - L) / (W - L - R) * (points.length - 1))));
+                $('#in-hover').text(dateOf(points[k].i) + ': ' + fmt(points[k].v) + ' ' + unit);
+            };
+        }
+
+        $('#in-window, #in-scale').on('change', render);
+        render();
+    })(jQuery);
+    </script>
+{% endblock %}

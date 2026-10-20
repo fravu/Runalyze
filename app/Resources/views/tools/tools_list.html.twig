@@ -63,6 +63,34 @@
     </p>
 
     <div class="panel-heading panel-sub-heading">
+        <h1>Auswertungen</h1>
+    </div>
+    <p class="file">
+        <a class="ajax" href="{{ url('tools-streaks') }}" target="ajax">
+            <strong class="block">Streaks</strong>
+            <small class="block">Längste und aktuelle Serien aufeinanderfolgender Trainingstage, optional mit Mindestdistanz.</small>
+        </a>
+    </p>
+    <p class="file">
+        <a class="ajax" href="{{ url('tools-eddington') }}" target="ajax">
+            <strong class="block">Eddington-Zahl</strong>
+            <small class="block">Die größte Zahl E, für die es mindestens E Tage mit mindestens E Kilometern (oder Meilen) gibt.</small>
+        </a>
+    </p>
+    <p class="file">
+        <a class="ajax" href="{{ url('tools-moving-mileage') }}" target="ajax">
+            <strong class="block">Gleitende Kilometer</strong>
+            <small class="block">Kilometer der vergangenen X Tage für jeden einzelnen Tag, ohne feste Wochen oder Monate.</small>
+        </a>
+    </p>
+    <p class="file">
+        <a class="ajax" href="{{ url('tools-performance-curves') }}" target="ajax">
+            <strong class="block">Leistungskurven</strong>
+            <small class="block">Bestwerte für Leistung, Pace und Herzfrequenz über feste Zeitfenster, aus den Streckendaten.</small>
+        </a>
+    </p>
+
+    <div class="panel-heading panel-sub-heading">
         <h1>{% trans %}Gimmick{% endtrans %}</h1>
     </div>
 

@@ -92,7 +92,7 @@ class RunalyzePluginStat_Tag extends PluginStat {
 		}
 
 		$LinkList = array();
-		$LinkList[] = '<li class="with-submenu"><span class="link">'.$this->AllTags[$this->TagId].'</span><ul class="submenu">';
+		$LinkList[] = '<li class="with-submenu"><span class="link">'.(isset($this->AllTags[$this->TagId]) ? $this->AllTags[$this->TagId] : '').'</span><ul class="submenu">';
 
 		foreach ($this->AllTags as $id => $name) {
 			$active = ($id == $this->TagId);

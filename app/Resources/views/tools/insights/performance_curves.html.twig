@@ -1,0 +1,123 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/insights/_common.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Leistungskurven</h1>
+    </div>
+
+    <div class="panel-content">
+        <form id="in-filter" class="in-filter" onsubmit="return false;">
+            <select name="metric">
+                <option value="power"{% if metric == 'power' %} selected{% endif %}>Leistung (Watt)</option>
+                <option value="pace"{% if metric == 'pace' %} selected{% endif %}>Pace (min/km)</option>
+                <option value="heartrate"{% if metric == 'heartrate' %} selected{% endif %}>Herzfrequenz (bpm)</option>
+            </select>
+            <select name="sport">
+                <option value="0">Alle Sportarten</option>
+                {% for s in sports %}
+                    <option value="{{ s.id }}"{% if sport == s.id %} selected{% endif %}>{{ s.name }} ({{ s.num }})</option>
+                {% endfor %}
+            </select>
+            <select name="days">
+                <option value="30"{% if days == 30 %} selected{% endif %}>Letzte 30 Tage</option>
+                <option value="90"{% if days == 90 %} selected{% endif %}>Letzte 90 Tage</option>
+                <option value="180"{% if days == 180 %} selected{% endif %}>Letzte 180 Tage</option>
+                <option value="365"{% if days == 365 %} selected{% endif %}>Letzte 365 Tage</option>
+                <option value="0"{% if days == 0 %} selected{% endif %}>Gesamte Zeit</option>
+            </select>
+        </form>
+
+        {% if rows|length == 0 %}
+            <p><em>Keine passenden Aktivitäten mit Streckendaten für diese Auswahl.{% if metric == 'power' %} Für die Leistung zählt nur gemessene Leistung (Leistungsmesser), keine von Runalyze berechnete.{% endif %}</em></p>
+        {% else %}
+            <svg id="in-chart" class="in-chart" viewBox="0 0 900 260" preserveAspectRatio="none"></svg>
+            <table class="fullwidth zebra-style in-table" style="margin-top:10px;">
+                <thead><tr><th>Dauer</th><th class="r">Bestwert</th><th>Aktivität</th><th>Datum</th></tr></thead>
+                <tbody>
+                    {% for r in rows %}
+                        <tr class="link" onclick="Runalyze.Overlay.close(); Runalyze.Training.load({{ r.activity }});">
+                            <td>{{ r.durationText }}</td>
+                            <td class="r"><strong>{{ r.valueText }}</strong></td>
+                            <td>{{ r.title|default('–') }}</td>
+                            <td>{{ r.dateText }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        <p class="in-note">
+            Bestwerte über feste Zeitfenster, berechnet aus den Streckendaten (eine Messung pro Sekunde, Lücken mit dem letzten Wert gefüllt).
+            {{ used }} von {{ activities }} Aktivitäten mit passenden Daten ausgewertet{% if truncated %}, begrenzt auf die neuesten oder durch das Zeitlimit; wähle einen kürzeren Zeitraum für mehr Genauigkeit{% endif %}.
+            Ein Klick auf eine Zeile öffnet die Aktivität.
+            {% if metric == 'power' %}Es zählt nur gemessene Leistung, keine von Runalyze berechnete.{% elseif metric == 'pace' %}Aktivitäten über 25 km/h Durchschnitt werden nicht berücksichtigt (z. B. als Lauf gespeicherte Fahrten).{% else %}Unplausible Pulswerte (unter 30 oder über 250 bpm) werden ignoriert.{% endif %}
+        </p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+
+        $('#in-filter select').on('change', function() {
+            $('#ajax').loadDiv('{{ url('tools-performance-curves') }}?' + $('#in-filter').serialize());
+        });
+
+        var metric = {{ metric|json_encode|raw }};
+        var data = {{ chart|json_encode|raw }};
+        var svg = document.getElementById('in-chart');
+
+        if (!svg || !data.length) { return; }
+
+        var NS = 'http://www.w3.org/2000/svg';
+        function make(tag, attrs) {
+            var el = document.createElementNS(NS, tag);
+            Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+            return el;
+        }
+
+        var W = 900, H = 260, L = 64, R = 14, T = 14, B = 28;
+        var minD = Math.log(data[0].d), maxD = Math.log(data[data.length - 1].d || 1);
+        var values = data.map(function (p) { return p.v; });
+        var lo = Math.min.apply(null, values) * 0.95, hi = Math.max.apply(null, values) * 1.05;
+        var x = function (d) { return L + (W - L - R) * (maxD > minD ? (Math.log(d) - minD) / (maxD - minD) : 0.5); };
+        var y = function (v) { return T + (H - T - B) * (1 - (v - lo) / (hi - lo || 1)); };
+
+        function axisLabel(v) {
+            if (metric === 'pace') {
+                var s = Math.round(3600 / v);
+                return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+            }
+            return Math.round(v);
+        }
+
+        for (var g = 0; g <= 4; g++) {
+            var gv = lo + (hi - lo) * g / 4;
+            svg.appendChild(make('line', { x1: L, x2: W - R, y1: y(gv), y2: y(gv), 'class': 'grid' }));
+            var t = make('text', { x: L - 6, y: y(gv) + 4, 'text-anchor': 'end' });
+            t.textContent = axisLabel(gv);
+            svg.appendChild(t);
+        }
+
+        data.forEach(function (p) {
+            var tx = make('text', { x: x(p.d), y: H - 8, 'text-anchor': 'middle' });
+            tx.textContent = p.d >= 60 ? (p.d / 60) + ' min' : p.d + ' s';
+            svg.appendChild(tx);
+        });
+
+        svg.appendChild(make('path', {
+            d: data.map(function (p, k) { return (k ? 'L' : 'M') + x(p.d).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' '),
+            'class': 'line'
+        }));
+
+        data.forEach(function (p) {
+            var c = make('circle', { cx: x(p.d), cy: y(p.v), r: 4, 'class': 'dot' });
+            var title = make('title', {});
+            title.textContent = p.label;
+            c.appendChild(title);
+            svg.appendChild(c);
+        });
+    })(jQuery);
+    </script>
+{% endblock %}
