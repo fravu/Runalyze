@@ -170,27 +170,46 @@ input, select, textarea, button {
 		background: var(--rz-nav-hover-bg);
 	}
 
-	#home #headline .rz-user .submenu-label {
-		color: var(--rz-nav-bg);
+	/* Profil: dunkles Symbol auf gelbem Kreis */
+	#home #headline .headline-menu.right.rz-user .submenu-label,
+	#home #headline .headline-menu.right.rz-user:hover .submenu-label,
+	#home #headline .headline-menu.right.rz-user.open .submenu-label {
+		color: #0b1530;
 		background: var(--rz-nav-accent);
+		box-shadow: 0 0 0 2px rgba(252, 191, 73, 0.35);
 	}
 
-	#home #headline .rz-user:hover .submenu-label {
-		color: var(--rz-nav-bg);
+	#home #headline .headline-menu.right.rz-user:hover .submenu-label,
+	#home #headline .headline-menu.right.rz-user.open .submenu-label {
 		background: #ffd36e;
 	}
 
-	/* Auswahlmenüs der oberen Icons */
+	#home #headline .headline-menu.right.rz-user .submenu-label i.fa {
+		font-size: 20px !important;
+	}
+
+	/* Auswahlmenüs der oberen Icons: keine Lücke zum Icon, sonst geht das Menü beim Hinfahren zu */
 	#home #headline .headline-menu.right .submenu {
 		top: 100%;
 		right: 0;
 		min-width: 230px;
-		margin-top: 6px;
+		margin: 0;
 		padding: 6px;
 		border: 1px solid var(--rz-nav-line);
+		border-top: 8px solid transparent;
 		border-radius: 10px;
 		background: var(--rz-nav-bg-flyout);
+		background-clip: padding-box;
 		box-shadow: 0 10px 28px rgba(10, 18, 40, 0.35);
+	}
+
+	#home #headline .headline-menu.right.open .submenu {
+		display: block;
+	}
+
+	#home #headline .headline-menu.right.open .submenu-label {
+		color: var(--rz-nav-text-hover);
+		background: var(--rz-nav-hover-bg);
 	}
 
 	#home #headline .headline-menu.right .submenu li {

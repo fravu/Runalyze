@@ -3,7 +3,7 @@
 Vorbild ist das neue Design von runalyze.com (siehe `runalyze-com-neuerungen.md`). Umgesetzt wurde bewusst nur ein Teil, und zwar ohne Less/gulp-Build.
 
 ## Was sich ändert
-- **Obere Leiste** (54 px): links das Logo, in der Mitte ein **Suchfeld**, rechts runde Icons für **Neu** (+), **Hilfe** (Buch), **Benachrichtigungen** und **Profil** (gelber Kreis). Diese Menüs öffnen sich wie bisher beim Darüberfahren unter dem Icon.
+- **Obere Leiste** (54 px): links das Logo, in der Mitte ein **Suchfeld**, rechts runde Icons für **Neu** (+), **Hilfe** (Buch), **Benachrichtigungen** und **Profil** (gelber Kreis). Diese Menüs öffnen sich beim Darüberfahren und per Klick (Klick daneben schließt). Zwischen Icon und Menü darf keine Lücke sein, sonst geht das Menü beim Hinfahren mit der Maus zu (statt Abstand deshalb ein transparenter Rand). Das Profil ist ein gelber Kreis mit dunklem Symbol.
 - **Suchfeld:** "Suche nach Tools, Einstellungen oder Seiten …". Es durchsucht alle Menüeinträge (Name und Menüname), zeigt bis zu 8 Treffer, Pfeiltasten und Enter wählen, Escape leert. Die Taste `/` springt ins Feld. Ein Treffer löst einen Klick auf den echten Menülink aus, die Fenster öffnen sich also wie sonst. Die Aktivitätssuche (Lupe links) bleibt davon getrennt.
 - **Linke Icon-Leiste** (56 px): **Haus** (Start, mit gelbem Rand wenn man auf dem Dashboard ist), Konfiguration, Tools, Extras, Aktivitäten suchen. Fährt man mit der Maus über ein Icon, erscheint daneben eine **Spalte in voller Höhe** (280 px) mit Überschrift und den Einträgen. Die Leiste selbst wird nicht breiter. Auf Touch-Geräten öffnet ein Tipp die Spalte.
 - **Schrift:** 13 px statt 11 px, Systemschrift (Segoe UI/Roboto/…) statt Verdana, Zeilenhöhe 1,45.

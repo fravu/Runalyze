@@ -319,8 +319,8 @@
 				return;
 			}
 
-			var label = e.target.closest('#rz-sidebar .headline-menu > .submenu-label');
-			var open = sidebar.querySelector('.headline-menu.open');
+			var label = e.target.closest('#rz-sidebar .headline-menu > .submenu-label, #headline .headline-menu.right > .submenu-label');
+			var open = document.querySelector('#rz-sidebar .headline-menu.open, #headline .headline-menu.open');
 
 			if (label) {
 				e.preventDefault();
