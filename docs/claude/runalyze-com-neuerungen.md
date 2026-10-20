@@ -48,3 +48,36 @@ Quelle: Websuche vom 23.09.2026. Changelog und Blog von runalyze.com waren aus d
 - https://blog.runalyze.com/releases/the-new-runalyze-design-is-now-live/
 - https://runalyze.com/help/article/features
 - https://www.runifyapp.com/blog/trainingpeaks-vs-runalyze-2026
+
+## Nachtrag 21.10.2026: Durchsicht von runalyze.com im Browser
+
+Quelle: Changelog `https://runalyze.com/changelog` und die Tools-Seite im angemeldeten Konto. Das Konto ist ein kostenloses ohne Aktivitäten, deshalb ließen sich die Ansichten nicht mit Daten ansehen. Viele Tools sind dort als Premium gekennzeichnet.
+
+### Neu seit der ersten Liste (23.09.2026)
+- 21.10.: Strava-Historienimport.
+- 06.10.: Originaldatei hochladen oder zusammenführen. Fehlende Werte (VO2max-Schätzung, Erholungszeit, Performance Condition, Training Effect, TRIMP, Schweißverlust, FTP, Developer-Felder) werden in bestehende Aktivitäten nachgetragen, automatisch bei gleicher Startzeit und Dauer oder per Auswahl.
+- 03.10.: Hammerhead-Sync repariert. 28.09.: Polar-JSON-Import behält manuelle Runden.
+- 22.09.: Leistungsmodelle mit wählbarem Referenzmaximum (gesamte Zeit, ab Datum, gleitendes Fenster, manuell).
+- 18.09.: Streak-Ansicht mit Mindestdistanz. 09.09.: neue Garmin-Aktivitäten mit höherer Sync-Priorität.
+- 17.09. und früher: MCP-Server (Alpha seit 18.05.) mit Aktivitätsdetails, Streckendaten, EPOC, geplanten Wettkämpfen, Developer-Feldern; Grok-Unterstützung.
+
+### Weitere Neuerungen 2026 (Changelog)
+- 05.05.: Redesign (Dark/Light, Seitenleiste mit Suche).
+- 29.05.: neuer Performance Status. 22.07. und 29.07.: Übersicht aller bestiegenen Gipfel mit Karte. 25.08.: Climb Score auch für Abstiege.
+- 18.08.: Mini-Kalender-Panel (Distanz, Dauer, TRIMP, aktive Tage), Streak-Statistik, Massenbearbeitung von Aktivitäten, Massenlöschen von Gesundheitsdaten. 03.09.: aktueller Streak im Kalender.
+- 08.09.: Langzeit-Zonenanalyse, neue Statistik zum gleitenden Kilometerstand, öffentliches Tool Laktat-Stufentest-Analyse. 04.09.: Trendanalyse mit gleitendem Durchschnitt; Histogramm mit umkehrbarer Stapelreihenfolge. 22.08.: Tags aus der Trendanalyse ausschließen.
+- 19.08.: geplante Wettkämpfe im Kalender; 12.06.: Wettkampfplanung mit Kartenlayout.
+- 16.09.: Garmin-DSGVO-Export importieren (Schlaf, Gewicht, Ruhepuls, HRV, Blutdruck).
+- 15.07. und 14.07.: Tool "Beste Teilabschnitte" mit Pace/Power-Diagramm, Splits-Diagramm.
+- 12.06.: Tiles-Counter-Historie. 05.06.: neues Datenfeld relativer Höhengewinn, Zeitleiste für Krankheiten.
+- 28.04.: Zepp/Amazfit-Sync. 06.03.: Zwift-Sync. 22.12.2025: Rouvy-Sync. 11.03.: geänderte Sporterkennung für FIT-Dateien.
+- 26.08.: Magic-Login-Link. 24.08.: Körperzusammensetzung in absoluten Werten, Google-Werbung entfernt.
+
+### Tools-Seite (Konto ohne Premium)
+Premium: Wiederkehrende Strecken, Beste Segmente, Qualitätseinheiten, Tiles Counter, Persönliches Streckennetz, Streaks, Eddington-Zahl, VO2max-Faktoranalyse, Gleitende Durchschnittskilometer.
+Frei: Histogramme, Trendanalyse, ANOVA, Verlaufsdiagramm, Marathonform, Running Performance Status, Form-Diagramm, Leistungskurven (Power, Pace, GAP, Puls), Wettkampf-Leistungsauswertung, Gesundheitstabelle, Erholungsstatus, VO2max-Analyse, Postergenerator, Jahresstatistiken, Lauftabellen.
+
+### Bezug zum Fork
+- Schon vorhanden bzw. ähnlich: Heatmap, Anstiege, Segmente (eigene Umsetzung), Trendanalyse, ANOVA, Poster, VO2max-Analyse.
+- Gut nachbaubar: Streaks, Eddington-Zahl, gleitende Kilometer, Leistungskurven, Zusammenführen von Originaldateien, Massenbearbeitung.
+- Nicht nachbaubar ohne Partnerzugang: Sync mit Polar, Suunto, Strava, Zepp usw. und der MCP-Dienst.
