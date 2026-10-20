@@ -40,3 +40,4 @@ var/cache/*
 var/logs/*
 !var/logs/.gitkeep
 var/sessions/
+data/.htaccess
