@@ -34,3 +34,10 @@ Ab PHP 8.1 enthält jeder Eintrag in `$_FILES` zusätzlich den Schlüssel `full_
 Fix in `src/functions.php` (wird von composer immer geladen, vor dem Start der Anwendung): `full_path` wird rekursiv aus `$_FILES` entfernt (`runalyze_strip_full_path_from_files()`). `vendor/` bleibt unverändert.
 
 Getestet: Upload einer FIT-Datei über das Tool wird erkannt, vorher kam ein 500er bzw. "kein Upload". Der normale Aktivitäts-Upload wurde nicht mit einer echten Datei durchgespielt, weil er Daten schreibt.
+
+## Gesamtprüfung nach dem Umstieg (21.10.2026)
+- Per `php -l` unter PHP 8.5: alle 1292 PHP-Dateien (`inc`, `src`, `plugin`, `app`, `call`) ohne Syntaxfehler.
+- Im angemeldeten Browser abgerufen und ohne Fehler: 48 Seiten (Einstellungen, Werkzeuge, Hilfe, Glossar, Plugin-Panels), 152 Aktivitätsansichten (Aktivität, Bearbeiten, VO2max, Splits, Höhe, Zeitreihen, Teilabschnitte, Climb Score) für Aktivitäten aller Sportarten, alle 16 Plugin-Seiten und die Exporte (TCX, GPX, KML, FITLOG sowie die HTML- und iFrame-Snippets) für drei Aktivitäten.
+- Nicht mit echten Daten durchgespielt, weil sie schreiben: der normale Aktivitäts-Upload, der Garmin-Import (die Auswahlliste lief, siehe `analyse-out-of-memory-fit-import.md`), der JSON-Datenbank-Import, Geräte-Sync-Dienste.
+- Die Tests unter `tests/` dürfen **nicht** gegen diese Datenbank laufen: `tests/bootstrap.php` leert die Datenbank.
+- Muster für weitere Fehler: Vergleiche mit `0` bei leeren Strings, `implode` in alter Argumentreihenfolge, Rechnen mit leeren Werten aus Streckendaten, strikte `int`-Typen mit Text-Werten, `$_FILES` mit `full_path`.
