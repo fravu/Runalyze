@@ -27,3 +27,10 @@ Getestet: `/dashboard` und `/feedback` ohne Sitzung antworten mit 302 auf `/en/l
 Getestet im Browser: Suchmaske öffnet, Dauer ist leer, die Suche findet 2043 Trainings. Das Log hat keinen neuen Eintrag.
 
 Typisches PHP-8-Muster für weitere Fehler: `'' == 0`, `null == 0` und `'abc' == 0` verhalten sich anders, ebenso `implode(array, string)`, Zugriff auf nicht existierende Array-Schlüssel (Warnung) und Typfehler bei int/string-Argumenten.
+
+## Datei-Uploads: PHP 8.1+ liefert `full_path` (behoben 21.10.2026)
+Ab PHP 8.1 enthält jeder Eintrag in `$_FILES` zusätzlich den Schlüssel `full_path`. Das Symfony-3.4-`FileBag` erkennt einen Upload nur bei genau den fünf Schlüsseln `error, name, size, tmp_name, type`. Mit dem sechsten Schlüssel liefert `$request->files->get(...)` ein Array statt einer `UploadedFile`. Betroffen waren alle Datei-Uploads: das Hochladen von Aktivitäten (`Internal\UploadController`, Feld `qqfile`), der JSON-Datenbank-Import und das neue Tool "Originaldatei zusammenführen".
+
+Fix in `src/functions.php` (wird von composer immer geladen, vor dem Start der Anwendung): `full_path` wird rekursiv aus `$_FILES` entfernt (`runalyze_strip_full_path_from_files()`). `vendor/` bleibt unverändert.
+
+Getestet: Upload einer FIT-Datei über das Tool wird erkannt, vorher kam ein 500er bzw. "kein Upload". Der normale Aktivitäts-Upload wurde nicht mit einer echten Datei durchgespielt, weil er Daten schreibt.

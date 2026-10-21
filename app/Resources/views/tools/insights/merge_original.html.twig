@@ -1,0 +1,102 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/insights/_common.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Originaldatei zusammenführen</h1>
+    </div>
+
+    <div class="panel-content">
+        <p class="in-note" style="margin-top:0;">
+            Manche Werte kommen bei der Synchronisation nicht an, zum Beispiel die VO2max-Schätzung, die Erholungszeit
+            oder die Performance Condition einer Garmin-Uhr. Die Originaldatei (.fit, etwa aus Garmin Connect heruntergeladen)
+            enthält sie. Hier wird die Datei einer vorhandenen Aktivität zugeordnet und es werden <strong>nur fehlende Werte ergänzt</strong>,
+            nichts Vorhandenes wird überschrieben.
+        </p>
+
+        <form id="mo-form" onsubmit="return false;" style="margin:10px 0;">
+            <input type="file" id="mo-file" accept=".fit">
+            <button type="button" id="mo-send" class="button">Datei prüfen</button>
+            <span id="mo-status" class="in-note"></span>
+        </form>
+        {% if maxFileSize %}
+            <p class="in-note">Maximale Dateigröße: {{ (maxFileSize / 1048576)|number_format(1, ',', '.') }} MB.</p>
+        {% endif %}
+
+        <div id="mo-result"></div>
+
+        <p class="in-note">
+            Gesucht wird eine Aktivität mit derselben Kennung oder mit einem Start innerhalb von 15 Minuten und ähnlicher Dauer.
+            Ergänzt werden FIT-Werte wie VO2max-Schätzung, Erholungszeit, Training Effect, Performance Condition,
+            Laktatschwelle, Spitzenbelastung, Schweißverlust, Atemfrequenz, Pulszonen des Geräts und die Laufdauer-Werte.
+            Datenreihen (zum Beispiel Developer-Felder wie SmO2) und Streckendaten werden nicht verändert.
+        </p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+
+        var token = null;
+
+        function esc(text) { return $('<div>').text(text === null || text === undefined ? '' : text).html(); }
+
+        $('#mo-send').on('click', function() {
+            var file = $('#mo-file')[0].files[0];
+            if (!file) { $('#mo-status').text('Bitte zuerst eine Datei wählen.'); return; }
+
+            var data = new FormData();
+            data.append('file', file);
+            $('#mo-status').html('<i class="fa fa-spinner fa-spin"></i> Datei wird gelesen …');
+            $('#mo-result').empty();
+
+            $.ajax({ url: '{{ url('tools-merge-original-preview') }}', method: 'POST', data: data, processData: false, contentType: false, dataType: 'json' })
+                .done(function(res) {
+                    token = res.token;
+                    $('#mo-status').text('');
+                    var html = '<p><strong>' + esc(res.file) + '</strong>: Start ' + esc(res.new.dateText) + ', ' + esc(res.new.duration) + ', ' + esc(res.new.km) + ' km</p>';
+
+                    if (!res.candidates.length) {
+                        html += '<p class="info">Keine passende Aktivität gefunden. Die Datei kann normal hochgeladen werden, wenn die Aktivität noch fehlt.</p>';
+                    }
+
+                    res.candidates.forEach(function(c) {
+                        html += '<div style="border:1px solid #d5dbe8; border-radius:8px; padding:10px 12px; margin:8px 0;">' +
+                            '<strong>' + esc(c.dateText) + '</strong> &nbsp; ' + esc(c.title || '–') + ' &nbsp; <small>' + esc(c.duration) + ', ' + esc(c.km) + ' km, ' +
+                            (c.reason === 'id' ? 'gleiche Kennung' : 'gleiche Startzeit und Dauer') + '</small>';
+                        if (c.missing.length) {
+                            html += '<ul style="margin:6px 0 8px 18px;">';
+                            c.missing.forEach(function(m) { html += '<li>' + esc(m.label) + ': <strong>' + esc(m.value) + '</strong></li>'; });
+                            html += '</ul><button type="button" class="button mo-apply" data-activity="' + c.id + '">Diese Werte ergänzen</button>';
+                        } else {
+                            html += '<p class="in-note" style="margin:6px 0 0;">Nichts zu ergänzen, alle Werte der Datei sind schon vorhanden.</p>';
+                        }
+                        html += '</div>';
+                    });
+
+                    $('#mo-result').html(html);
+                })
+                .fail(function(xhr) {
+                    var message = (xhr.responseJSON && xhr.responseJSON.error) || 'Fehler beim Prüfen der Datei.';
+                    $('#mo-status').text(message);
+                });
+        });
+
+        $('#mo-result').on('click', '.mo-apply', function() {
+            var button = $(this);
+            if (!confirm('Fehlende Werte in diese Aktivität eintragen? Das ändert gespeicherte Daten.')) { return; }
+            button.prop('disabled', true);
+
+            $.post('{{ url('tools-merge-original-apply') }}', { token: token, activity: button.data('activity') })
+                .done(function(res) {
+                    button.replaceWith('<span class="in-note"><strong>' + res.changed.length + ' Wert(e) ergänzt:</strong> ' + esc(res.changed.join(', ')) + '</span>');
+                })
+                .fail(function(xhr) {
+                    button.prop('disabled', false);
+                    $('#mo-status').text((xhr.responseJSON && xhr.responseJSON.error) || 'Fehler beim Speichern.');
+                });
+        });
+    })(jQuery);
+    </script>
+{% endblock %}

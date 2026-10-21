@@ -5,12 +5,14 @@ namespace Runalyze\Bundle\CoreBundle\Controller\My\Tools;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\BulkEditor;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\CadenceCorrection;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\DayStatistics;
+use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\OriginalFileMerger;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\PerformanceCurve;
 use Runalyze\Bundle\CoreBundle\Entity\Account;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -352,5 +354,187 @@ class InsightsController extends Controller
         }
 
         return new JsonResponse($result);
+    }
+    /**
+     * @return OriginalFileMerger
+     */
+    private function originalFileMerger()
+    {
+        return new OriginalFileMerger(
+            $this->get('app.file_importer'),
+            $this->get('app.activity_data_container.filter'),
+            $this->get('app.activity_data_container.converter'),
+            $this->getDoctrine()->getManager(),
+            $this->get('app.legacy_cache')
+        );
+    }
+
+    /**
+     * @return string directory for uploaded files that wait for the user's decision
+     */
+    private function mergeDirectory()
+    {
+        $directory = $this->getParameter('data_directory').'/import/merge/';
+
+        if (!is_dir($directory)) {
+            @mkdir($directory, 0775, true);
+        }
+
+        foreach (glob($directory.'*.fit') ?: [] as $old) {
+            if (filemtime($old) < time() - 3600) {
+                @unlink($old);
+            }
+        }
+
+        return $directory;
+    }
+
+    /**
+     * @Route("/my/tools/merge-original", name="tools-merge-original")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function mergeOriginalAction()
+    {
+        $serverParams = new \Runalyze\Util\ServerParams();
+        $maxFileSize = min($serverParams->getPostMaxSizeInBytes(), $serverParams->getUploadMaxFilesize());
+
+        return $this->render('tools/insights/merge_original.html.twig', [
+            'maxFileSize' => $maxFileSize < PHP_INT_MAX ? $maxFileSize : false,
+        ]);
+    }
+
+    /**
+     * @Route("/my/tools/merge-original/preview", name="tools-merge-original-preview")
+     * @Method("POST")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function mergeOriginalPreviewAction(Request $request, Account $account)
+    {
+        if (!$request->isXmlHttpRequest()) {
+            return new JsonResponse(['error' => 'Nur per Ajax erlaubt.'], 400);
+        }
+
+        @set_time_limit(120);
+
+        $file = $request->files->get('file');
+
+        if (is_array($file)) {
+            $file = reset($file);
+        }
+
+        if (!$file instanceof UploadedFile || !$file->isValid()) {
+            return new JsonResponse(['error' => 'Die Datei konnte nicht hochgeladen werden (zu groß oder kein Upload).'], 400);
+        }
+
+        if ('fit' !== strtolower((string)$file->getClientOriginalExtension())) {
+            return new JsonResponse(['error' => 'Bitte eine Originaldatei im FIT-Format (.fit) wählen.'], 400);
+        }
+
+        $token = bin2hex(random_bytes(16));
+        $directory = $this->mergeDirectory();
+        $file->move($directory, $token.'.fit');
+        $path = $directory.$token.'.fit';
+        $merger = $this->originalFileMerger();
+
+        try {
+            $new = $merger->parse($path, $account);
+        } catch (\Throwable $e) {
+            @unlink($path);
+
+            return new JsonResponse(['error' => 'Die Datei konnte nicht gelesen werden: '.$e->getMessage()], 422);
+        }
+
+        if (null === $new) {
+            @unlink($path);
+
+            return new JsonResponse(['error' => 'In der Datei wurde keine Aktivität gefunden.'], 422);
+        }
+
+        $candidates = [];
+
+        foreach ($merger->candidates($new, $account) as $candidate) {
+            $activity = $candidate['activity'];
+            $missing = [];
+
+            foreach ($merger->missing($activity, $new) as $values) {
+                $missing[] = ['label' => $values['label'], 'value' => OriginalFileMerger::format($values['new'])];
+            }
+
+            $candidates[] = [
+                'id' => $activity->getId(),
+                'dateText' => date('d.m.Y H:i', (int)$activity->getTime()),
+                'title' => (string)$activity->getTitle(),
+                'duration' => self::duration((int)$activity->getS()),
+                'km' => number_format((float)$activity->getDistance(), 2, ',', '.'),
+                'reason' => $candidate['reason'],
+                'missing' => $missing,
+            ];
+        }
+
+        return new JsonResponse([
+            'token' => $token,
+            'file' => $file->getClientOriginalName(),
+            'new' => [
+                'dateText' => date('d.m.Y H:i', (int)$new->getTime()),
+                'duration' => self::duration((int)$new->getS()),
+                'km' => number_format((float)$new->getDistance(), 2, ',', '.'),
+            ],
+            'candidates' => $candidates,
+        ]);
+    }
+
+    /**
+     * @Route("/my/tools/merge-original/apply", name="tools-merge-original-apply")
+     * @Method("POST")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function mergeOriginalApplyAction(Request $request, Account $account)
+    {
+        if (!$request->isXmlHttpRequest()) {
+            return new JsonResponse(['error' => 'Nur per Ajax erlaubt.'], 400);
+        }
+
+        @set_time_limit(120);
+
+        $token = (string)$request->request->get('token', '');
+        $activityId = (int)$request->request->get('activity', 0);
+
+        if (!preg_match('/^[a-f0-9]{32}$/', $token)) {
+            return new JsonResponse(['error' => 'Ungültige Anfrage.'], 400);
+        }
+
+        $path = $this->mergeDirectory().$token.'.fit';
+
+        if (!is_file($path)) {
+            return new JsonResponse(['error' => 'Die hochgeladene Datei ist abgelaufen, bitte erneut wählen.'], 404);
+        }
+
+        $merger = $this->originalFileMerger();
+
+        try {
+            $new = $merger->parse($path, $account);
+        } catch (\Throwable $e) {
+            return new JsonResponse(['error' => 'Die Datei konnte nicht gelesen werden.'], 422);
+        }
+
+        if (null === $new) {
+            return new JsonResponse(['error' => 'In der Datei wurde keine Aktivität gefunden.'], 422);
+        }
+
+        // only activities that were offered as a match for this file
+        foreach ($merger->candidates($new, $account) as $candidate) {
+            if ($candidate['activity']->getId() === $activityId) {
+                $changed = $merger->merge($candidate['activity'], $new);
+                @unlink($path);
+
+                if (!empty($changed)) {
+                    $this->get('app.automatic_reload_flag_setter')->set(\Runalyze\Bundle\CoreBundle\Services\AutomaticReloadFlagSetter::FLAG_ALL);
+                }
+
+                return new JsonResponse(['changed' => $changed]);
+            }
+        }
+
+        return new JsonResponse(['error' => 'Diese Aktivität passt nicht zur Datei.'], 400);
     }
 }
