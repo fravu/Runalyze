@@ -142,6 +142,7 @@
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-eddington'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Eddington-Zahl</a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-moving-mileage'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Gleitende Kilometer</a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-performance-curves'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Leistungskurven</a></li>
+                <li><a class="window" href="<?php echo $this->get('router')->generate('tools-cadence-correction'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Kadenzkorrektur</a></li>
                 <li class="separator"></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('tools-garmin-sync'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;Garmin Connect Sync</a></li>
                 <li><a class="window" href="<?php echo $this->get('router')->generate('multi-editor'); ?>"><i class="fa fa-fw fa-chevron-right small"></i>&nbsp;<?php _e('Multi editor'); ?></a></li>

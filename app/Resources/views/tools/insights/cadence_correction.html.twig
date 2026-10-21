@@ -1,0 +1,110 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/insights/_common.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Kadenzkorrektur</h1>
+    </div>
+
+    <div class="panel-content">
+        <p class="in-note" style="margin-top:0;">
+            Findet Aktivitäten, deren Kadenz vermutlich halbiert oder verdoppelt gespeichert wurde, und korrigiert sie.
+            Die Kadenz steht so in der Datenbank, wie das Gerät sie meldet. Beim Laufen ist das der Wert pro Bein
+            (typisch etwa 80 für 160 Schritte pro Minute).
+        </p>
+
+        <form id="in-filter" class="in-filter" onsubmit="return false;">
+            <select name="sport">
+                {% for s in sports %}
+                    <option value="{{ s.id }}"{% if sport == s.id %} selected{% endif %}>{{ s.name }} ({{ s.num }})</option>
+                {% endfor %}
+            </select>
+            <label>zu niedrig bis <input type="text" name="low" value="{{ low }}" size="3" style="text-align:right;"></label>
+            <label>zu hoch ab <input type="text" name="high" value="{{ high }}" size="3" style="text-align:right;"></label>
+            <button type="button" id="in-apply">Anzeigen</button>
+        </form>
+
+        {% if candidates|length == 0 %}
+            <p><em>Keine auffälligen Aktivitäten für diese Grenzen gefunden.</em></p>
+        {% else %}
+            <table class="fullwidth zebra-style in-table">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="cc-all" title="Alle auswählen"></th>
+                        <th>Datum</th><th>Titel</th><th class="r">Distanz</th>
+                        <th class="r">Kadenz jetzt</th><th class="r">Vorschlag</th><th class="r">Faktor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in candidates %}
+                        <tr>
+                            <td><input type="checkbox" class="cc-row" value="{{ c.id }}" data-factor="{{ c.direction }}"></td>
+                            <td>{{ c.dateText }}</td>
+                            <td>{{ c.title|default('–') }}</td>
+                            <td class="r">{{ c.distance|number_format(2, ',', '.') }} km</td>
+                            <td class="r">{{ c.cadence }}</td>
+                            <td class="r"><strong>{{ c.newCadence }}</strong></td>
+                            <td class="r">{{ c.direction == 2 ? '× 2' : '÷ 2' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if candidates|length >= limit %}
+                <p class="in-note">Es werden höchstens {{ limit }} Aktivitäten angezeigt, die neuesten zuerst.</p>
+            {% endif %}
+
+            <p>
+                <button type="button" id="cc-run" class="button">Ausgewählte korrigieren</button>
+                <span id="cc-result" class="in-note"></span>
+            </p>
+        {% endif %}
+
+        <p class="in-note">
+            Geändert werden die Kadenz der Aktivität und die Kadenzkurve der Streckendaten sowie die daraus abgeleitete
+            Schrittlänge (umgekehrt zum Faktor). Rückgängig machen geht mit dem entgegengesetzten Faktor. Rundungen bei
+            ungeraden Werten sind dabei nicht verlustfrei, daher vorher auswählen, was wirklich falsch ist.
+            Zum Beispiel ist 150 (pro Bein) beim Laufen meist ein doppelt gespeicherter Wert, 40 ein halbierter.
+        </p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+
+        $('#in-apply').on('click', function() {
+            $('#ajax').loadDiv('{{ url('tools-cadence-correction') }}?' + $('#in-filter').serialize());
+        });
+        $('#in-filter select').on('change', function() { $('#in-apply').click(); });
+        $('#cc-all').on('change', function() { $('.cc-row').prop('checked', this.checked); });
+
+        $('#cc-run').on('click', function() {
+            var groups = {};
+            $('.cc-row:checked').each(function() {
+                var f = $(this).data('factor');
+                (groups[f] = groups[f] || []).push($(this).val());
+            });
+            var keys = Object.keys(groups);
+            var total = keys.reduce(function(n, k) { return n + groups[k].length; }, 0);
+
+            if (!total) { $('#cc-result').text('Nichts ausgewählt.'); return; }
+            if (!confirm(total + ' Aktivität(en) korrigieren? Das ändert gespeicherte Daten.')) { return; }
+
+            $('#cc-run').prop('disabled', true);
+            var done = 0;
+
+            (function next() {
+                var k = keys.shift();
+                if (k === undefined) {
+                    $('#cc-result').text(done + ' Aktivität(en) korrigiert.');
+                    setTimeout(function() { $('#in-apply').click(); }, 1200);
+                    return;
+                }
+                $.post('{{ url('tools-cadence-correction-apply') }}', { ids: groups[k], factor: k })
+                    .done(function(res) { done += res.changed; next(); })
+                    .fail(function() { $('#cc-result').text('Fehler beim Speichern.'); $('#cc-run').prop('disabled', false); });
+            })();
+        });
+    })(jQuery);
+    </script>
+{% endblock %}
