@@ -65,6 +65,9 @@ class RunalyzePluginPanel_Prognose extends PluginPanel {
 					__('David Cameron uses a fixed coefficient for the fatigue over time/distance and slightly different formulas than Robert Bock. '.
 						'This model uses your best result.').'<br>'.
 						'<small>see <a href="http://www.infobarrel.com/Runners_Math_How_to_Predict_Your_Race_Time">http://www.infobarrel.com/Runners_Math_How_to_Predict_Your_Race_Time</a></small>');
+		echo HTML::fileBlock('<strong>Peter Riegel</strong><br>'.
+					__('Peter Riegel uses a single exponent (1.06) for the fatigue over time/distance: T2 = T1 x (D2 / D1)^1.06. '.
+						'This model uses your best result.') );
 		echo HTML::info( __('The VO2max model is the only one which considers your current shape. '.
 							'The other models are based on your previous race results.') );
 	}
@@ -80,7 +83,8 @@ class RunalyzePluginPanel_Prognose extends PluginPanel {
 			'vo2max'	=> __('Effective VO2max'),
 			'cpp'		=> 'Robert Bock (CPP)',
 			'steffny'	=> 'Herbert Steffny',
-			'cameron'	=> 'David Cameron'
+			'cameron'	=> 'David Cameron',
+			'riegel'	=> 'Peter Riegel'
 		) );
 		$Model->setDefaultValue('vo2max');
 
@@ -174,6 +178,16 @@ class RunalyzePluginPanel_Prognose extends PluginPanel {
 			case 'cameron':
                 $topResults = $this->getTopResult(2);
                 $this->Prognosis = new \Runalyze\Sports\Running\Prognosis\Cameron();
+
+                if (count($topResults) == 2) {
+                    $this->Prognosis->setReferenceResult($topResults[0]['distance'], $topResults[0]['s']);
+                }
+
+                break;
+
+			case 'riegel':
+                $topResults = $this->getTopResult(2);
+                $this->Prognosis = new \Runalyze\Sports\Running\Prognosis\Riegel();
 
                 if (count($topResults) == 2) {
                     $this->Prognosis->setReferenceResult($topResults[0]['distance'], $topResults[0]['s']);

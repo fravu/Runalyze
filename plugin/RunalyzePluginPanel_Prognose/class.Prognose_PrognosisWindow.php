@@ -152,6 +152,10 @@ class Prognose_PrognosisWindow {
                 $this->setupCameronPrognosis();
                 break;
 
+            case 'peter-riegel':
+                $this->setupRiegelPrognosis();
+                break;
+
             case 'vo2max':
             default:
                 $this->setupEffectiveVO2maxPrognosis();
@@ -218,6 +222,14 @@ class Prognose_PrognosisWindow {
 	protected function setupCameronPrognosis()
     {
 		$this->PrognosisObject = new \Runalyze\Sports\Running\Prognosis\Cameron(
+            (new Duration($_POST['best-result-time']))->seconds(),
+            $_POST['best-result-km']
+        );
+	}
+
+	protected function setupRiegelPrognosis()
+    {
+		$this->PrognosisObject = new \Runalyze\Sports\Running\Prognosis\Riegel(
             (new Duration($_POST['best-result-time']))->seconds(),
             $_POST['best-result-km']
         );
@@ -378,6 +390,7 @@ class Prognose_PrognosisWindow {
 		$FieldModel->addOption('robert-bock', 'Robert Bock (CPP)');
 		$FieldModel->addOption('herbert-steffny', 'Herbert Steffny');
 		$FieldModel->addOption('david-cameron', 'David Cameron');
+		$FieldModel->addOption('peter-riegel', 'Peter Riegel');
 		$FieldModel->addAttribute('onchange', '$(\'#prognosis-calculator .only-\'+$(this).val()).closest(\'div\').show();$(\'#prognosis-calculator .hide-on-model-change:not(.only-\'+$(this).val()+\')\').closest(\'div\').hide();');
 		$FieldModel->setLayout( FormularFieldset::$LAYOUT_FIELD_W50_AS_W100 );
 
@@ -425,6 +438,7 @@ class Prognose_PrognosisWindow {
 		$BestResult->addCSSclass('only-robert-bock');
 		$BestResult->addCSSclass('only-herbert-steffny');
 		$BestResult->addCSSclass('only-david-cameron');
+		$BestResult->addCSSclass('only-peter-riegel');
 		$BestResult->setUnit($this->UnitSystem->distanceUnit());
 
 		$BestResultTime = new FormularInput('best-result-time', __('in'));
@@ -433,6 +447,7 @@ class Prognose_PrognosisWindow {
 		$BestResultTime->addCSSclass('only-robert-bock');
 		$BestResultTime->addCSSclass('only-herbert-steffny');
 		$BestResultTime->addCSSclass('only-david-cameron');
+		$BestResultTime->addCSSclass('only-peter-riegel');
 
 		$SecondBestResult = new FormularInput('second-best-result-km', __('Second best result'));
 		$SecondBestResult->setLayout( FormularFieldset::$LAYOUT_FIELD_W50 );

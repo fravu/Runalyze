@@ -60,11 +60,38 @@ class RunalyzePluginPanel_Rechenspiele extends PluginPanel {
 		$ShowBE->setTooltip( __('Guess current marathon shape') );
 		$ShowBE->setDefaultValue(true);
 
+		$ReferenceMode = new PluginConfigurationValueSelect('reference_max_mode', __('Reference maximum (ATL/CTL)'));
+		$ReferenceMode->setTooltip( __('Percentages of fatigue and fitness refer to a maximum. Choose how it is determined.') );
+		$ReferenceMode->setOptions( array(
+			'all'		=> __('All time'),
+			'since'		=> __('Since a date'),
+			'rolling'	=> __('Rolling window (days)'),
+			'manual'	=> __('Enter by hand')
+		) );
+		$ReferenceMode->setDefaultValue('all');
+
+		$ReferenceSince = new PluginConfigurationValue('reference_max_since', __('Reference maximum: since date (YYYY-MM-DD)'));
+		$ReferenceSince->setDefaultValue('');
+
+		$ReferenceDays = new PluginConfigurationValueInt('reference_max_days', __('Reference maximum: rolling window in days'));
+		$ReferenceDays->setDefaultValue(365);
+
+		$ReferenceATL = new PluginConfigurationValueInt('reference_max_atl', __('Reference maximum: ATL by hand'));
+		$ReferenceATL->setDefaultValue(0);
+
+		$ReferenceCTL = new PluginConfigurationValueInt('reference_max_ctl', __('Reference maximum: CTL by hand'));
+		$ReferenceCTL->setDefaultValue(0);
+
 		$Configuration = new PluginConfiguration($this->id());
 		$Configuration->addValue($ShowTrimp);
 		$Configuration->addValue($ShowTrimpExtra);
 		$Configuration->addValue($ShowVO2max);
 		$Configuration->addValue($ShowBE);
+		$Configuration->addValue($ReferenceMode);
+		$Configuration->addValue($ReferenceSince);
+		$Configuration->addValue($ReferenceDays);
+		$Configuration->addValue($ReferenceATL);
+		$Configuration->addValue($ReferenceCTL);
 
 		$this->setConfiguration($Configuration);
 	}
@@ -102,6 +129,44 @@ class RunalyzePluginPanel_Rechenspiele extends PluginPanel {
 	}
 
 	/**
+	 * Reference maxima for the percentages of fatigue and fitness
+	 * @param \Runalyze\Sports\Performance\Model\TsbModel $Model
+	 * @param string $Mode since|rolling|manual
+	 * @param int $FallbackATL stored all-time maximum
+	 * @param int $FallbackCTL stored all-time maximum
+	 * @return int[] array(ATL, CTL)
+	 */
+	protected function referenceMaxima(TsbModel $Model, $Mode, $FallbackATL, $FallbackCTL) {
+		if ('manual' == $Mode) {
+			$ATL = (int)$this->Configuration()->value('reference_max_atl');
+			$CTL = (int)$this->Configuration()->value('reference_max_ctl');
+
+			return array($ATL > 0 ? $ATL : $FallbackATL, $CTL > 0 ? $CTL : $FallbackCTL);
+		}
+
+		if ('since' == $Mode) {
+			$Since = strtotime((string)$this->Configuration()->value('reference_max_since').' 00:00:00');
+			$Days = false === $Since ? 0 : (int)ceil((time() - $Since) / DAY_IN_S);
+		} else {
+			$Days = (int)$this->Configuration()->value('reference_max_days');
+		}
+
+		if ($Days < 1) {
+			return array($FallbackATL, $FallbackCTL);
+		}
+
+		$ATL = 0;
+		$CTL = 0;
+
+		for ($i = 0; $i <= $Days; ++$i) {
+			$ATL = max($ATL, $Model->fatigueAt(-$i));
+			$CTL = max($CTL, $Model->fitnessAt(-$i));
+		}
+
+		return array(max(1, $ATL), max(1, $CTL));
+	}
+
+	/**
 	 * Show values
 	 */
 	protected function showValues() {
@@ -128,14 +193,21 @@ class RunalyzePluginPanel_Rechenspiele extends PluginPanel {
 		$ModelATLmax = $TSBmodel->maxFatigue();
 		$ModelCTLmax = $TSBmodel->maxFitness();
 
-		if ($ModelATLmax > $ATLmax) {
-			Configuration::Data()->updateMaxATL($ModelATLmax);
-			$ATLmax = $ModelATLmax;
-		}
+		$ReferenceMode = $this->Configuration()->value('reference_max_mode');
 
-		if ($ModelCTLmax > $CTLmax) {
-			Configuration::Data()->updateMaxCTL($ModelCTLmax);
-			$CTLmax = $ModelCTLmax;
+		if ('all' == $ReferenceMode || !in_array($ReferenceMode, array('since', 'rolling', 'manual'))) {
+			if ($ModelATLmax > $ATLmax) {
+				Configuration::Data()->updateMaxATL($ModelATLmax);
+				$ATLmax = $ModelATLmax;
+			}
+
+			if ($ModelCTLmax > $CTLmax) {
+				Configuration::Data()->updateMaxCTL($ModelCTLmax);
+				$CTLmax = $ModelCTLmax;
+			}
+		} else {
+			// other reference modes do not change the stored all-time maxima
+			list($ATLmax, $CTLmax) = $this->referenceMaxima($TSBmodel, $ReferenceMode, $ATLmax, $CTLmax);
 		}
 
 		$ATLabsolute = $TSBmodel->fatigueAt(0);

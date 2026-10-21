@@ -31,6 +31,8 @@ class TopResults
 					`accountid`='.\SessionAccountHandler::getId().' AND
 					`sportid`='.Configuration::General()->runningSport().'
 					AND `distance` >= "'.$minimalDistanceRequired.'"
+					AND `use_vo2max` = 1
+					AND '.\Runalyze\Bundle\CoreBundle\Entity\Training::sqlPlausibleRunningSpeed().'
 				ORDER BY `vo2max_by_time` DESC
 				LIMIT 20
 			) as `tmp`
