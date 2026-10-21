@@ -2,6 +2,7 @@
 
 namespace Runalyze\Bundle\CoreBundle\Controller\My\Tools;
 
+use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\BulkEditor;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\CadenceCorrection;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\DayStatistics;
 use Runalyze\Bundle\CoreBundle\Component\Tool\Insights\PerformanceCurve;
@@ -264,5 +265,92 @@ class InsightsController extends Controller
         }
 
         return new JsonResponse(['changed' => $changed]);
+    }
+    /**
+     * @Route("/my/tools/bulk-edit", name="tools-bulk-edit")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function bulkEditAction(Request $request, Account $account)
+    {
+        $prefix = $this->getParameter('database_prefix');
+        $connection = $this->getDoctrine()->getConnection();
+        $filter = [
+            'sport' => max(0, (int)$request->query->get('sport', 0)),
+            'from' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$request->query->get('from')) ? (string)$request->query->get('from') : '',
+            'to' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$request->query->get('to')) ? (string)$request->query->get('to') : '',
+            'q' => trim((string)$request->query->get('q', '')),
+        ];
+
+        $where = 't.`accountid` = ?';
+        $params = [$account->getId()];
+
+        if ($filter['sport'] > 0) {
+            $where .= ' AND t.`sportid` = ?';
+            $params[] = $filter['sport'];
+        }
+
+        if ('' !== $filter['from']) {
+            $where .= ' AND t.`time` >= ?';
+            $params[] = strtotime($filter['from'].' 00:00:00');
+        }
+
+        if ('' !== $filter['to']) {
+            $where .= ' AND t.`time` <= ?';
+            $params[] = strtotime($filter['to'].' 23:59:59');
+        }
+
+        if ('' !== $filter['q']) {
+            $where .= ' AND t.`title` LIKE ?';
+            $params[] = '%'.addcslashes($filter['q'], '%_\\').'%';
+        }
+
+        $rows = $connection->fetchAll(
+            'SELECT t.`id`, t.`time`, t.`title`, t.`distance`, t.`is_public`, s.`name` AS `sport`, ty.`name` AS `type`
+             FROM `'.$prefix.'training` t
+             JOIN `'.$prefix.'sport` s ON s.`id` = t.`sportid`
+             LEFT JOIN `'.$prefix.'type` ty ON ty.`id` = t.`typeid`
+             WHERE '.$where.' ORDER BY t.`time` DESC LIMIT 300',
+            $params
+        );
+
+        foreach ($rows as &$row) {
+            $row['dateText'] = date('d.m.Y H:i', (int)$row['time']);
+        }
+
+        return $this->render('tools/insights/bulk_edit.html.twig', [
+            'filter' => $filter,
+            'rows' => $rows,
+            'sports' => $connection->fetchAll('SELECT `id`, `name` FROM `'.$prefix.'sport` WHERE `accountid` = ? ORDER BY `name`', [$account->getId()]),
+            'types' => $connection->fetchAll(
+                'SELECT ty.`id`, ty.`name`, s.`name` AS `sport` FROM `'.$prefix.'type` ty JOIN `'.$prefix.'sport` s ON s.`id` = ty.`sportid`
+                 WHERE ty.`accountid` = ? ORDER BY s.`name`, ty.`name`',
+                [$account->getId()]
+            ),
+            'tags' => $connection->fetchAll('SELECT `id`, `tag` FROM `'.$prefix.'tag` WHERE `accountid` = ? ORDER BY `tag`', [$account->getId()]),
+            'maxPerRequest' => BulkEditor::MAX_ACTIVITIES,
+        ]);
+    }
+
+    /**
+     * @Route("/my/tools/bulk-edit/apply", name="tools-bulk-edit-apply")
+     * @Method("POST")
+     * @Security("has_role('ROLE_USER')")
+     */
+    public function bulkEditApplyAction(Request $request, Account $account)
+    {
+        if (!$request->isXmlHttpRequest()) {
+            return new JsonResponse(['error' => 'Nur per Ajax erlaubt.'], 400);
+        }
+
+        @set_time_limit(120);
+
+        $editor = new BulkEditor($this->getDoctrine()->getManager(), $this->get('app.legacy_cache'));
+        $result = $editor->apply($account, (array)$request->request->get('ids', []), (array)$request->request->get('changes', []));
+
+        if ($result['changed'] > 0) {
+            $this->get('app.automatic_reload_flag_setter')->set(\Runalyze\Bundle\CoreBundle\Services\AutomaticReloadFlagSetter::FLAG_ALL);
+        }
+
+        return new JsonResponse($result);
     }
 }

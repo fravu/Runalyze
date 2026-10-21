@@ -1,0 +1,144 @@
+{% extends "base_logged_in.twig" %}
+
+{% block content %}
+    {% include 'tools/insights/_common.html.twig' %}
+
+    <div class="panel-heading">
+        <h1>Massenbearbeitung</h1>
+    </div>
+
+    <div class="panel-content">
+        <form id="in-filter" class="in-filter" onsubmit="return false;">
+            <select name="sport">
+                <option value="0">Alle Sportarten</option>
+                {% for s in sports %}
+                    <option value="{{ s.id }}"{% if filter.sport == s.id %} selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+            </select>
+            <label>von <input type="date" name="from" value="{{ filter.from }}"></label>
+            <label>bis <input type="date" name="to" value="{{ filter.to }}"></label>
+            <label>Titel enthält <input type="text" name="q" value="{{ filter.q }}" size="16"></label>
+            <button type="button" id="in-apply">Anzeigen</button>
+        </form>
+
+        {% if rows|length == 0 %}
+            <p><em>Keine Aktivitäten für diesen Filter.</em></p>
+        {% else %}
+            <fieldset id="be-changes" style="margin:12px 0; padding:10px 12px; border:1px solid #d5dbe8; border-radius:8px;">
+                <legend><strong>Für die ausgewählten Aktivitäten ändern</strong> <small class="in-note">(leer lassen = unverändert)</small></legend>
+                <div class="in-filter">
+                    <label>Sportart
+                        <select id="be-sport">
+                            <option value="">unverändert</option>
+                            {% for s in sports %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    <label>Typ
+                        <select id="be-type">
+                            <option value="">unverändert</option>
+                            <option value="none">kein Typ</option>
+                            {% for t in types %}<option value="{{ t.id }}">{{ t.sport }}: {{ t.name }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    <label>Öffentlich
+                        <select id="be-public">
+                            <option value="">unverändert</option>
+                            <option value="1">ja</option>
+                            <option value="0">nein</option>
+                        </select>
+                    </label>
+                    <label>Tag hinzufügen
+                        <select id="be-addtag">
+                            <option value="">–</option>
+                            {% for t in tags %}<option value="{{ t.id }}">{{ t.tag }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    <label>Tag entfernen
+                        <select id="be-removetag">
+                            <option value="">–</option>
+                            {% for t in tags %}<option value="{{ t.id }}">{{ t.tag }}</option>{% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <button type="button" id="be-run" class="button">Änderungen speichern</button>
+                <span id="be-result" class="in-note"></span>
+            </fieldset>
+
+            <table class="fullwidth zebra-style in-table">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="be-all" title="Alle auswählen"></th>
+                        <th>Datum</th><th>Titel</th><th>Sportart</th><th>Typ</th><th class="r">Distanz</th><th>Öffentlich</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rows %}
+                        <tr>
+                            <td><input type="checkbox" class="be-row" value="{{ r.id }}"></td>
+                            <td>{{ r.dateText }}</td>
+                            <td>{{ r.title|default('–') }}</td>
+                            <td>{{ r.sport }}</td>
+                            <td>{{ r.type|default('–') }}</td>
+                            <td class="r">{{ r.distance|number_format(2, ',', '.') }} km</td>
+                            <td>{{ r.is_public ? 'ja' : 'nein' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if rows|length >= 300 %}
+                <p class="in-note">Es werden höchstens 300 Aktivitäten angezeigt, die neuesten zuerst. Mit dem Filter lässt sich die Auswahl eingrenzen.</p>
+            {% endif %}
+
+        {% endif %}
+
+        <p class="in-note">
+            Gespeichert wird wie im Aktivitäts-Editor: bei einem Wechsel der Sportart laufen die üblichen Neuberechnungen mit.
+            Ein Aktivitätstyp gehört zu genau einer Sportart. Passt er nach dem Wechsel nicht mehr, wird er entfernt.
+            Ist beim Ändern des Typs der Typ der falschen Sportart gewählt, wird diese Aktivität übersprungen und aufgelistet.
+            Ausrüstung lässt sich hier nicht ändern, weil dafür Summen mitgeführt werden (bitte im Editor).
+        </p>
+    </div>
+
+    <script>
+    (function($){
+        Runalyze.Overlay.setBigSize();
+
+        $('#in-apply').on('click', function() {
+            $('#ajax').loadDiv('{{ url('tools-bulk-edit') }}?' + $('#in-filter').serialize());
+        });
+        $('#in-filter select').on('change', function() { $('#in-apply').click(); });
+        $('#be-all').on('change', function() { $('.be-row').prop('checked', this.checked); });
+
+        $('#be-run').on('click', function() {
+            var ids = $('.be-row:checked').map(function() { return $(this).val(); }).get();
+            var changes = {};
+            if ($('#be-sport').val() !== '') changes.sport = $('#be-sport').val();
+            if ($('#be-type').val() !== '') changes.type = $('#be-type').val();
+            if ($('#be-public').val() !== '') changes.public = $('#be-public').val();
+            if ($('#be-addtag').val() !== '') changes.addTag = $('#be-addtag').val();
+            if ($('#be-removetag').val() !== '') changes.removeTag = $('#be-removetag').val();
+
+            if (!ids.length) { $('#be-result').text('Keine Aktivität ausgewählt.'); return; }
+            if (!Object.keys(changes).length) { $('#be-result').text('Keine Änderung gewählt.'); return; }
+            if (!confirm(ids.length + ' Aktivität(en) ändern? Das ändert gespeicherte Daten.')) { return; }
+
+            $('#be-run').prop('disabled', true);
+            var changed = 0, skipped = [];
+
+            (function next() {
+                if (!ids.length) {
+                    var text = changed + ' Aktivität(en) geändert.';
+                    if (skipped.length) { text += ' Übersprungen: ' + skipped.slice(0, 5).join(' ') + (skipped.length > 5 ? ' …' : ''); }
+                    $('#be-result').text(text);
+                    setTimeout(function() { $('#in-apply').click(); }, skipped.length ? 4000 : 1200);
+                    return;
+                }
+                var chunk = ids.splice(0, 25);
+                $.post('{{ url('tools-bulk-edit-apply') }}', { ids: chunk, changes: changes })
+                    .done(function(res) { changed += res.changed; skipped = skipped.concat(res.skipped || []); next(); })
+                    .fail(function() { $('#be-result').text('Fehler beim Speichern (' + changed + ' bereits geändert).'); $('#be-run').prop('disabled', false); });
+            })();
+        });
+    })(jQuery);
+    </script>
+{% endblock %}
